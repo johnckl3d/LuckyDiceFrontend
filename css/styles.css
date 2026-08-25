@@ -1,0 +1,100 @@
+body {
+  background: #f4f1ea;
+  min-height: 100vh;
+}
+
+.table-felt {
+  background: radial-gradient(circle at 50% 20%, #2f7a4a, #1b4d32 70%);
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.35);
+}
+
+.dice-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.die {
+  width: 72px;
+  height: 72px;
+  border: 0;
+  border-radius: 14px;
+  background: #f8f4ef;
+  box-shadow:
+    0 8px 0 #c9c0b5,
+    0 12px 18px rgba(0, 0, 0, 0.25);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 10px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.die:hover {
+  transform: translateY(-2px);
+}
+
+.die.is-held {
+  outline: 3px solid #ffd166;
+  transform: translateY(4px);
+  box-shadow:
+    0 2px 0 #c9c0b5,
+    0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.die.is-rolling {
+  animation: shake 0.45s ease;
+}
+
+.pip {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #1f1a17;
+  margin: auto;
+  opacity: 0;
+}
+
+.die[data-value="1"] .pip:nth-child(5),
+.die[data-value="2"] .pip:nth-child(1),
+.die[data-value="2"] .pip:nth-child(9),
+.die[data-value="3"] .pip:nth-child(1),
+.die[data-value="3"] .pip:nth-child(5),
+.die[data-value="3"] .pip:nth-child(9),
+.die[data-value="4"] .pip:nth-child(1),
+.die[data-value="4"] .pip:nth-child(3),
+.die[data-value="4"] .pip:nth-child(7),
+.die[data-value="4"] .pip:nth-child(9),
+.die[data-value="5"] .pip:nth-child(1),
+.die[data-value="5"] .pip:nth-child(3),
+.die[data-value="5"] .pip:nth-child(5),
+.die[data-value="5"] .pip:nth-child(7),
+.die[data-value="5"] .pip:nth-child(9),
+.die[data-value="6"] .pip:nth-child(1),
+.die[data-value="6"] .pip:nth-child(3),
+.die[data-value="6"] .pip:nth-child(4),
+.die[data-value="6"] .pip:nth-child(6),
+.die[data-value="6"] .pip:nth-child(7),
+.die[data-value="6"] .pip:nth-child(9) {
+  opacity: 1;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-12deg);
+  }
+  75% {
+    transform: rotate(12deg);
+  }
+}
+
+#score-table td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
