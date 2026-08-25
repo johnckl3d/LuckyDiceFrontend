@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Five Dice</title>
+    <title>Lucky Dice</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -14,64 +14,119 @@
   </head>
   <body>
     <nav class="navbar navbar-dark bg-dark">
-      <div class="container">
-        <span class="navbar-brand mb-0 h1">Five Dice</span>
-        <span class="navbar-text" id="engine-status">Engine: local fallback</span>
+      <div class="container-fluid px-3 px-md-4">
+        <span class="navbar-brand mb-0 h1">Lucky Dice</span>
+        <span class="navbar-text" id="engine-status">Engine: local mock</span>
       </div>
     </nav>
 
-    <main class="container py-4">
+    <main class="container-fluid py-3 py-md-4 px-3 px-md-4">
       <div class="row g-4">
         <div class="col-lg-8">
-          <section class="table-felt rounded-4 p-4 p-md-5 text-center">
-            <p class="text-white-50 mb-4" id="turn-status">
-              Click Roll to throw all five dice. Click a die to hold it.
-            </p>
+          <p class="mb-3" id="turn-status">Starting game…</p>
 
-            <div class="dice-row" id="dice-row" aria-label="Five dice"></div>
+          <section class="table-felt rounded-4 p-3 p-md-4" aria-label="Play table">
+            <div class="board-row board-row-drop mb-3" data-row="4">
+              <div class="board-row-label">Row 4 · Second pair</div>
+              <div class="dice-slots" id="row-4" aria-label="Second pair drop zone"></div>
+            </div>
 
-            <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
-              <button type="button" class="btn btn-light btn-lg px-4" id="roll-btn">
-                Roll
-              </button>
-              <button type="button" class="btn btn-outline-light" id="new-game-btn">
-                New game
-              </button>
+            <div class="board-row board-row-drop mb-3" data-row="3">
+              <div class="board-row-label">Row 3 · Pair or better</div>
+              <div class="dice-slots" id="row-3" aria-label="Pair or better drop zone"></div>
+            </div>
+
+            <div class="board-row mb-3" data-row="2">
+              <div class="board-row-label">Row 2 · Rolled dice</div>
+              <div class="dice-slots" id="row-2" aria-label="Rolled dice"></div>
+            </div>
+
+            <div class="board-row board-row-actions" data-row="1">
+              <div class="board-row-label">Row 1 · Actions</div>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <button type="button" class="btn btn-light btn-lg px-4" id="submit-btn" disabled>
+                  Submit
+                </button>
+                <button type="button" class="btn btn-outline-light btn-lg" id="roll-btn" hidden>
+                  Reroll selected
+                </button>
+                <div class="timer-block text-white text-end flex-grow-1">
+                  <div class="d-flex justify-content-end align-items-baseline gap-2">
+                    <span class="small text-white-50">Time</span>
+                    <span class="timer-digits font-monospace" id="timer-label">—</span>
+                  </div>
+                  <div class="progress mt-1" style="height: 8px" role="timer" aria-label="Turn timer">
+                    <div class="progress-bar bg-warning" id="timer-bar" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
         </div>
 
         <div class="col-lg-4">
           <div class="card shadow-sm">
-            <div class="card-header">Turn</div>
-            <ul class="list-group list-group-flush">
-              <li class="list-group-item d-flex justify-content-between">
-                Rolls left <span class="fw-semibold" id="rolls-left">3</span>
-              </li>
-              <li class="list-group-item d-flex justify-content-between">
-                Held dice <span class="fw-semibold" id="held-count">0</span>
-              </li>
-              <li class="list-group-item d-flex justify-content-between">
-                Values
-                <span class="fw-semibold font-monospace" id="values-label">—</span>
-              </li>
-            </ul>
+            <div class="card-header d-flex justify-content-between align-items-center">
+              Players
+              <label class="small mb-0 d-flex align-items-center gap-2">
+                Seats
+                <select class="form-select form-select-sm" id="seat-count" style="width: auto">
+                  <option value="2" selected>2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </label>
+            </div>
+            <ul class="list-group list-group-flush" id="player-list"></ul>
+            <div class="card-footer">
+              <button type="button" class="btn btn-outline-secondary btn-sm w-100" id="new-game-btn">
+                New game
+              </button>
+            </div>
           </div>
 
           <div class="card shadow-sm mt-3">
-            <div class="card-header">Score (preview)</div>
+            <div class="card-header">Ranking</div>
             <div class="card-body p-0">
-              <table class="table table-sm mb-0" id="score-table">
-                <tbody></tbody>
+              <table class="table table-sm mb-0" id="ranking-table">
+                <thead>
+                  <tr>
+                    <th>Place</th>
+                    <th>Player</th>
+                    <th>Hand</th>
+                    <th>Dice</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colspan="4" class="text-muted">No tally yet</td>
+                  </tr>
+                </tbody>
               </table>
             </div>
-            <div class="card-footer text-muted small">
-              Scoring is local for now. Wire <code>js/api.js</code> to your engine when it is ready.
+            <div class="card-footer text-muted small" id="ranking-note">
+              After everyone submits round 1, the lowest hand rolls in round 2.
             </div>
           </div>
         </div>
       </div>
     </main>
+
+    <div class="modal fade" id="result-modal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="result-title">Game over</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="result-body"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" id="result-new-game-btn">New game</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
