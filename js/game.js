@@ -607,9 +607,7 @@ async function newGame() {
 
 async function showEngineStatus() {
   const status = await pingEngine();
-  if (!USE_ENGINE) {
-    els.engineStatus.textContent = "Engine: local mock";
-  } else if (status.ok) {
+  if (status.ok) {
     els.engineStatus.textContent = "Engine: connected";
   } else {
     els.engineStatus.textContent = "Engine: unreachable";
