@@ -13,10 +13,53 @@
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body>
+    <div id="login-screen" class="login-screen">
+      <div class="login-card card shadow">
+        <div class="card-body p-4">
+          <h1 class="h4 mb-1">Lucky Dice</h1>
+          <p class="text-muted mb-4">Sign in to play</p>
+          <form id="login-form" novalidate>
+            <div class="mb-3">
+              <label class="form-label" for="login-userid">User ID</label>
+              <input
+                class="form-control"
+                id="login-userid"
+                name="userId"
+                autocomplete="username"
+                required
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="login-password">Password</label>
+              <input
+                type="password"
+                class="form-control"
+                id="login-password"
+                name="password"
+                autocomplete="current-password"
+                required
+              />
+            </div>
+            <div class="alert alert-danger d-none" id="login-error" role="alert"></div>
+            <button type="submit" class="btn btn-dark w-100" id="login-submit">
+              Log in
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="app-screen" hidden>
     <nav class="navbar navbar-dark bg-dark">
       <div class="container-fluid px-3 px-md-4">
         <span class="navbar-brand mb-0 h1">Lucky Dice</span>
-        <span class="navbar-text" id="engine-status">Engine: local mock</span>
+        <div class="d-flex align-items-center gap-3">
+          <span class="navbar-text" id="signed-in-user"></span>
+          <span class="navbar-text" id="engine-status">Engine: local mock</span>
+          <button type="button" class="btn btn-outline-light btn-sm" id="logout-btn">
+            Log out
+          </button>
+        </div>
       </div>
     </nav>
 
@@ -127,13 +170,13 @@
         </div>
       </div>
     </div>
+    </div>
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
-    <script src="js/api.js"></script>
-    <script src="js/game.js"></script>
+    <script type="module" src="app/main.js"></script>
   </body>
 </html>

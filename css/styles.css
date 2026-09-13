@@ -3,6 +3,23 @@ body {
   min-height: 100vh;
 }
 
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at 50% 10%, #2f7a4a, #1b4d32 62%),
+    #1b4d32;
+}
+
+.login-card {
+  width: min(100%, 26rem);
+  border: 0;
+  border-radius: 1rem;
+}
+
 #turn-status {
   color: #3d342c;
   font-weight: 500;
