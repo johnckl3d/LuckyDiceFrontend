@@ -120,6 +120,10 @@ function onDrop(event, row) {
   handlers.onDrop?.(index, row);
 }
 
+export function showGameScreen(visible = true) {
+  document.getElementById("game-screen").hidden = !visible;
+}
+
 export function bindGameView(nextHandlers) {
   handlers = nextHandlers;
 
@@ -146,11 +150,9 @@ export function bindGameView(nextHandlers) {
 }
 
 export function initResultModal() {
-  if (resultModal) {
-    return false;
+  if (!resultModal) {
+    resultModal = new bootstrap.Modal(document.getElementById("result-modal"));
   }
-  resultModal = new bootstrap.Modal(document.getElementById("result-modal"));
-  return true;
 }
 
 export function setTimerDisplay(seconds, total) {

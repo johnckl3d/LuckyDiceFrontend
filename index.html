@@ -56,6 +56,9 @@
         <div class="d-flex align-items-center gap-3">
           <span class="navbar-text" id="signed-in-user"></span>
           <span class="navbar-text" id="engine-status">Engine: local mock</span>
+          <button type="button" class="btn btn-outline-light btn-sm" id="lobby-nav-btn">
+            Lobby
+          </button>
           <button type="button" class="btn btn-outline-light btn-sm" id="logout-btn">
             Log out
           </button>
@@ -63,6 +66,110 @@
       </div>
     </nav>
 
+    <div id="lobby-screen">
+      <main class="container py-3 py-md-4">
+        <div class="row g-4">
+          <div class="col-lg-4">
+            <div class="card shadow-sm">
+              <div class="card-header">Create game</div>
+              <div class="card-body">
+                <form id="create-game-form" novalidate>
+                  <div class="mb-3">
+                    <label class="form-label" for="create-player-count">Players</label>
+                    <select class="form-select" id="create-player-count">
+                      <option value="2" selected>2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6">6</option>
+                      <option value="7">7</option>
+                      <option value="8">8</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label" for="create-turn-time">Turn time (seconds)</label>
+                    <input
+                      class="form-control"
+                      id="create-turn-time"
+                      type="number"
+                      min="1"
+                      value="15"
+                      required
+                    />
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label" for="create-stake">Stake</label>
+                    <input
+                      class="form-control"
+                      id="create-stake"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value="0"
+                      required
+                    />
+                  </div>
+                  <div class="alert alert-danger d-none" id="lobby-error" role="alert"></div>
+                  <button type="submit" class="btn btn-dark w-100" id="create-game-btn">
+                    Create game
+                  </button>
+                </form>
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline-secondary w-100 mt-3" id="practice-table-btn">
+              Practice table
+            </button>
+          </div>
+          <div class="col-lg-8">
+            <div class="card shadow-sm">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                Open games
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="refresh-lobby-btn">
+                  Refresh
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm mb-0" id="lobby-games-table">
+                  <thead>
+                    <tr>
+                      <th>Game</th>
+                      <th>Status</th>
+                      <th>Seats</th>
+                      <th>Waiting</th>
+                      <th>Turn</th>
+                      <th>Stake</th>
+                      <th>Players</th>
+                    </tr>
+                  </thead>
+                  <tbody id="lobby-games-body">
+                    <tr>
+                      <td colspan="7" class="text-muted">Loading games…</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div class="modal fade" id="lobby-ready-modal" tabindex="-1" aria-labelledby="lobby-ready-title" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="lobby-ready-title">Game ready</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="lobby-ready-body">All seats are filled</div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-dark" data-bs-dismiss="modal">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="game-screen" hidden>
     <main class="container-fluid py-3 py-md-4 px-3 px-md-4">
       <div class="row g-4">
         <div class="col-lg-8">
@@ -171,12 +278,14 @@
       </div>
     </div>
     </div>
+    </div>
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
     <script type="module" src="app/main.js"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-import { login } from "../services/apiService.js";
+import { disconnectSockets, login } from "../services/apiService.js";
 import { clearSession, getSession } from "../models/loginModel.js";
 import {
   bindLoginView,
@@ -8,7 +8,7 @@ import {
   showLogin,
   showLoginError,
 } from "../views/loginView.js";
-import { bootGame } from "./gameController.js";
+import { enterLobby, initLobbyController, leaveLobby } from "./lobbyController.js";
 
 async function handleLogin() {
   const { userId, password } = readLoginForm();
@@ -22,22 +22,25 @@ async function handleLogin() {
   try {
     const session = await login(userId, password);
     showApp(session);
-    bootGame();
+    enterLobby();
   } catch (error) {
     showLoginError(
-      error.message === "Failed to fetch" ? "Could not reach the login API." : error.message
+      error.message === "Failed to fetch" ? "Could not reach the game engine." : error.message
     );
   } finally {
     setLoginBusy(false);
   }
 }
 
-function handleLogout() {
+async function handleLogout() {
+  leaveLobby();
+  await disconnectSockets();
   clearSession();
   showLogin();
 }
 
 export function initLoginController() {
+  initLobbyController();
   bindLoginView({
     onSubmit: handleLogin,
     onLogout: handleLogout,
@@ -46,7 +49,7 @@ export function initLoginController() {
   const existingSession = getSession();
   if (existingSession) {
     showApp(existingSession);
-    bootGame();
+    enterLobby();
   } else {
     showLogin();
   }

@@ -1,71 +1,145 @@
 /**
- * Engine HTTP client.
- * The game engine lives in LuckyDiceAPI at ENGINE_URL.
+ * LuckyDiceAPI SignalR client.
+ * Hubs: /hubs/auth, /hubs/game, /hubs/lobby
  */
 
-import { utcTimestampHeader } from "../utils/helpers.js";
 import { getSession, setSession } from "../models/loginModel.js";
 
 const ENGINE_URL = "http://localhost:8080";
 
-function apiHeaders(includeJson = true) {
-  const headers = {
-    "X-Timestamp": utcTimestampHeader(),
+const connections = {
+  auth: null,
+  game: null,
+  lobby: null,
+};
+
+let lobbyToken = "";
+let lobbyNotificationHandlers = null;
+
+function signalRLib() {
+  const lib = window.signalR;
+  if (!lib) {
+    throw new Error("SignalR client failed to load.");
+  }
+  return lib;
+}
+
+function hubError(error) {
+  const raw = String(error?.message ?? error ?? "Socket request failed");
+  const match = raw.match(/HubException:\s*([\s\S]+)$/i);
+  if (match) {
+    return new Error(match[1].trim());
+  }
+  if (/Status code '401'|Unauthorized/i.test(raw)) {
+    return new Error("Session expired. Please log in again.");
+  }
+  if (/Failed to (start|fetch)|WebSocket failed|negotiate|ERR_CONNECTION/i.test(raw)) {
+    return new Error("Could not reach the game engine.");
+  }
+  return new Error(raw);
+}
+
+function buildConnection(path, withAccessToken) {
+  const { HubConnectionBuilder } = signalRLib();
+  const options = {
+    withCredentials: false,
+    ...(withAccessToken
+      ? {
+          accessTokenFactory: () => getSession()?.accessToken ?? "",
+        }
+      : {}),
   };
-  if (includeJson) {
-    headers["Content-Type"] = "application/json";
-  }
-  const session = getSession();
-  if (session?.accessToken) {
-    headers.Authorization = `Bearer ${session.accessToken}`;
-  }
-  return headers;
+
+  return new HubConnectionBuilder()
+    .withUrl(`${ENGINE_URL}${path}`, options)
+    .withAutomaticReconnect()
+    .build();
 }
 
-async function readErrorMessage(response) {
-  try {
-    const payload = await response.json();
-    if (payload?.error) {
-      return payload.error;
-    }
-    if (payload?.requiredTimestamp) {
-      return "Request timestamp was rejected. Check the device clock and try again.";
-    }
-  } catch {
-    // Fall through to status text.
-  }
-  return `Engine request failed: ${response.status}`;
-}
-
-async function post(path, body) {
-  const response = await fetch(`${ENGINE_URL}${path}`, {
-    method: "POST",
-    headers: apiHeaders(),
-    body: JSON.stringify(body),
+function waitUntilConnected(connection) {
+  const { HubConnectionState } = signalRLib();
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      if (connection.state === HubConnectionState.Connected) {
+        window.clearInterval(timer);
+        resolve();
+        return;
+      }
+      if (Date.now() - started > 10000) {
+        window.clearInterval(timer);
+        reject(new Error("Could not reach the game engine."));
+      }
+    }, 50);
   });
+}
 
-  if (!response.ok) {
-    throw new Error(await readErrorMessage(response));
+async function stopConnection(key) {
+  const connection = connections[key];
+  if (!connection) {
+    return;
+  }
+  try {
+    await connection.stop();
+  } catch {
+    // Ignore shutdown errors.
+  }
+  connections[key] = null;
+  if (key === "lobby") {
+    lobbyToken = "";
+  }
+}
+
+async function ensureConnection(key, path, withAccessToken = false) {
+  const { HubConnectionState } = signalRLib();
+
+  if (withAccessToken) {
+    const token = getSession()?.accessToken ?? "";
+    if (!token) {
+      throw new Error("Unauthorized");
+    }
+    if (connections[key] && lobbyToken !== token) {
+      await stopConnection(key);
+    }
   }
 
-  return response.json();
+  if (!connections[key]) {
+    connections[key] = buildConnection(path, withAccessToken);
+    if (withAccessToken) {
+      lobbyToken = getSession()?.accessToken ?? "";
+    }
+    if (key === "lobby") {
+      bindLobbyNotificationHandlers(connections[key]);
+    }
+  }
+
+  const connection = connections[key];
+  if (connection.state === HubConnectionState.Disconnected) {
+    try {
+      await connection.start();
+    } catch (error) {
+      throw hubError(error);
+    }
+  }
+
+  if (connection.state !== HubConnectionState.Connected) {
+    await waitUntilConnected(connection);
+  }
+
+  return connection;
+}
+
+async function invoke(key, path, method, args = [], withAccessToken = false) {
+  const connection = await ensureConnection(key, path, withAccessToken);
+  try {
+    return await connection.invoke(method, ...args);
+  } catch (error) {
+    throw hubError(error);
+  }
 }
 
 export async function login(userId, password) {
-  const response = await fetch(`${ENGINE_URL}/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Timestamp": utcTimestampHeader(),
-    },
-    body: JSON.stringify({ userId, password }),
-  });
-
-  if (!response.ok) {
-    throw new Error(await readErrorMessage(response));
-  }
-
-  const tokens = await response.json();
+  const tokens = await invoke("auth", "/hubs/auth", "Login", [{ userId, password }]);
   setSession({
     userId,
     accessToken: tokens.accessToken,
@@ -76,25 +150,54 @@ export async function login(userId, password) {
 
 export async function pingEngine() {
   try {
-    const response = await fetch(`${ENGINE_URL}/health`);
-    return { ok: response.ok, mode: "engine" };
+    await ensureConnection("auth", "/hubs/auth");
+    return { ok: true, mode: "engine" };
   } catch {
     return { ok: false, mode: "engine-unreachable" };
   }
 }
 
+function bindLobbyNotificationHandlers(connection) {
+  connection.off("lobbyUpdated");
+  connection.off("gameReady");
+  if (lobbyNotificationHandlers?.onUpdated) {
+    connection.on("lobbyUpdated", lobbyNotificationHandlers.onUpdated);
+  }
+  if (lobbyNotificationHandlers?.onReady) {
+    connection.on("gameReady", lobbyNotificationHandlers.onReady);
+  }
+}
+
+export async function subscribeLobbyNotifications(handlers) {
+  lobbyNotificationHandlers = handlers;
+  const connection = await ensureConnection("lobby", "/hubs/lobby", true);
+  bindLobbyNotificationHandlers(connection);
+}
+
+export async function listLobbyGames() {
+  return invoke("lobby", "/hubs/lobby", "ListGames", [], true);
+}
+
+export async function createLobbyGame(payload) {
+  return invoke("lobby", "/hubs/lobby", "CreateGame", [payload], true);
+}
+
 export async function startGame(players) {
-  return post("/game/start", { players });
+  return invoke("game", "/hubs/game", "Start", [{ players }]);
 }
 
 export async function rollDice(payload) {
-  return post("/roll", payload);
+  return invoke("game", "/hubs/game", "Roll", [payload]);
 }
 
 export async function submitHand(payload) {
-  return post("/submit", payload);
+  return invoke("game", "/hubs/game", "Submit", [payload]);
 }
 
 export async function tallyHands(payload) {
-  return post("/tally", payload);
+  return invoke("game", "/hubs/game", "Tally", [payload]);
+}
+
+export async function disconnectSockets() {
+  await Promise.all(["auth", "game", "lobby"].map((key) => stopConnection(key)));
 }

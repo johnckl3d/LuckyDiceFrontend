@@ -33,6 +33,7 @@ import {
   setRankingNote,
   setStatus,
   setTimerDisplay,
+  showGameScreen,
   showResult,
 } from "../views/gameView.js";
 
@@ -340,7 +341,13 @@ async function handleReroll() {
   await takeRoll(held);
 }
 
-export function bootGame() {
+export function leaveGame() {
+  clearTimer();
+  hideResult();
+  showGameScreen(false);
+}
+
+export function enterGame() {
   if (!gameReady) {
     bindGameView({
       onDieClick,
@@ -352,12 +359,10 @@ export function bootGame() {
       onNewGame: newGame,
     });
     gameReady = true;
+    initResultModal();
   }
 
-  if (!initResultModal()) {
-    return;
-  }
-
+  showGameScreen(true);
   showEngineStatus();
   newGame();
 }
