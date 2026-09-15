@@ -3,6 +3,7 @@ import {
   rollDice,
   startGame,
   submitHand,
+  subscribeGameNotifications,
   tallyHands,
 } from "../services/apiService.js";
 import { TIMER_SECONDS, aiDelay, wait } from "../utils/helpers.js";
@@ -12,9 +13,12 @@ import {
   currentPlayer,
   defaultPlayers,
   isHumanTurn,
+  normalizePlayer,
   playerById,
+  playerMatches,
   resetBoard,
   revertInvalidPlacements,
+  setOpeningRoll,
   standingValues,
   state,
   toggleReroll,
@@ -27,6 +31,7 @@ import {
   hideResult,
   initResultModal,
   renderBoard,
+  renderOpponentBoards,
   renderPlayers,
   renderRanking,
   setEngineStatus,
@@ -311,6 +316,7 @@ async function newGame() {
   state.round = 1;
   state.phase = "idle";
   state.selected.clear();
+  state.openingRolls = {};
   setRankingNote("After everyone submits round 1, the lowest hand rolls in round 2.");
   renderRanking();
 
@@ -347,7 +353,122 @@ export function leaveGame() {
   showGameScreen(false);
 }
 
-export function enterGame() {
+function applyStartedGame(started) {
+  clearTimer();
+  hideResult();
+  setTimerDisplay(null, TIMER_SECONDS);
+  state.ranking = [];
+  state.round = started.round ?? 1;
+  state.phase = "idle";
+  state.selected.clear();
+  state.openingRolls = {};
+  setRankingNote("After everyone submits round 1, the lowest hand rolls in round 2.");
+  renderRanking();
+
+  state.gameId = started.gameId;
+  state.players = (started.players ?? []).map(normalizePlayer);
+  state.currentPlayerId = started.currentPlayerId;
+  resetBoard();
+  renderPlayers();
+}
+
+function pick(object, names) {
+  for (const name of names) {
+    if (object?.[name] != null) {
+      return object[name];
+    }
+  }
+  return undefined;
+}
+
+function parseDiceValues(raw) {
+  if (Array.isArray(raw)) {
+    return raw.map(Number).filter((value) => value >= 1 && value <= 6);
+  }
+  if (typeof raw === "string") {
+    return raw
+      .split(/[,\s]+/)
+      .map(Number)
+      .filter((value) => value >= 1 && value <= 6);
+  }
+  return [];
+}
+
+function normalizeOpeningRolled(payload) {
+  if (!payload) {
+    return [];
+  }
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload.results)
+      ? payload.results
+      : Array.isArray(payload.rolls)
+        ? payload.rolls
+        : Array.isArray(payload.players)
+          ? payload.players
+          : [payload];
+
+  return items
+    .map((item) => {
+      const playerId = pick(item, [
+        "playerId",
+        "PlayerId",
+        "id",
+        "Id",
+        "userId",
+        "UserId",
+      ]);
+      const nested = item.player ?? item.Player;
+      return {
+        playerId: playerId ?? pick(nested, ["id", "playerId", "userId", "Id", "PlayerId"]),
+        values: parseDiceValues(
+          pick(item, [
+            "values",
+            "Values",
+            "dice",
+            "Dice",
+            "results",
+            "Results",
+            "openingRoll",
+            "OpeningRoll",
+            "openingResult",
+            "OpeningResult",
+            "diceValues",
+            "DiceValues",
+          ]) ?? item.roll?.values ?? item.Roll?.Values ?? item.result?.values ?? item.Result?.Values
+        ),
+        placements: pick(item, ["placements", "Placements"]),
+      };
+    })
+    .filter((item) => item.playerId && item.values.length);
+}
+
+export function applyOpeningRolled(payload) {
+  const rolls = normalizeOpeningRolled(payload);
+  if (!rolls.length) {
+    return;
+  }
+
+  rolls.forEach((roll) => {
+    const player = state.players.find((entry) => playerMatches(entry, roll.playerId));
+    const playerId = player?.id ?? roll.playerId;
+    setOpeningRoll(playerId, roll.values, roll.placements);
+  });
+
+  renderOpponentBoards();
+}
+
+async function listenForGameNotifications() {
+  try {
+    await subscribeGameNotifications({
+      onOpeningRolled: applyOpeningRolled,
+    });
+  } catch {
+    // Engine status already covers connection errors.
+  }
+}
+
+export function enterGame(started) {
   if (!gameReady) {
     bindGameView({
       onDieClick,
@@ -364,5 +485,16 @@ export function enterGame() {
 
   showGameScreen(true);
   showEngineStatus();
+  listenForGameNotifications();
+  if (started?.gameId) {
+    applyStartedGame(started);
+    if (state.currentPlayerId) {
+      startTurn(state.currentPlayerId);
+    } else {
+      setStatus("Game started. Waiting for your turn…");
+    }
+    return;
+  }
+
   newGame();
 }

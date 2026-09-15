@@ -1,4 +1,4 @@
-import { canDrag, isHumanTurn, state } from "../models/gameModel.js";
+import { canDrag, isHumanTurn, otherPlayers, state } from "../models/gameModel.js";
 
 let resultModal = null;
 let handlers = {};
@@ -9,6 +9,7 @@ const els = {
   row2: document.getElementById("row-2"),
   row3: document.getElementById("row-3"),
   row4: document.getElementById("row-4"),
+  opponentBoards: document.getElementById("opponent-boards"),
   submitBtn: document.getElementById("submit-btn"),
   rollBtn: document.getElementById("roll-btn"),
   newGameBtn: document.getElementById("new-game-btn"),
@@ -26,11 +27,12 @@ const els = {
 function createDie(index, value, options) {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "die";
+  button.className = options.compact ? "die die-compact" : "die";
   button.draggable = Boolean(options.draggable);
   button.dataset.index = String(index);
   button.dataset.value = String(value);
   button.setAttribute("aria-label", `Die ${index + 1}, ${value}`);
+  button.disabled = options.interactive === false;
 
   if (options.selected) {
     button.classList.add("is-selected");
@@ -48,22 +50,26 @@ function createDie(index, value, options) {
     button.appendChild(pipEl);
   }
 
-  button.addEventListener("click", (event) => {
-    event.preventDefault();
-    handlers.onDieClick?.(index);
-  });
-
-  button.addEventListener("dragstart", (event) => onDragStart(event, index));
-  button.addEventListener("dragend", onDragEnd);
+  if (options.interactive !== false) {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      handlers.onDieClick?.(index);
+    });
+    button.addEventListener("dragstart", (event) => onDragStart(event, index));
+    button.addEventListener("dragend", onDragEnd);
+  }
 
   return button;
 }
 
-function createSlot(row, index) {
+function createSlot(row, index, options = {}) {
   const slot = document.createElement("div");
-  slot.className = "die-slot";
+  slot.className = options.compact ? "die-slot die-slot-compact" : "die-slot";
   slot.dataset.row = String(row);
   slot.dataset.index = String(index);
+  if (options.interactive === false) {
+    return slot;
+  }
   slot.addEventListener("dragover", onDragOver);
   slot.addEventListener("dragleave", onDragLeave);
   slot.addEventListener("drop", (event) => onDrop(event, row));
@@ -203,6 +209,73 @@ export function renderPlayers() {
 
     item.append(name, badge);
     els.playerList.appendChild(item);
+  });
+  renderOpponentBoards();
+}
+
+function appendRowSlots(host, row, roll, compact) {
+  host.innerHTML = "";
+  for (let index = 0; index < 5; index += 1) {
+    const slot = createSlot(row, index, { compact, interactive: false });
+    const occupied = roll && roll.placements[index] === row;
+    if (occupied) {
+      slot.appendChild(
+        createDie(index, roll.values[index], {
+          compact,
+          interactive: false,
+        })
+      );
+    }
+    host.appendChild(slot);
+  }
+}
+
+function createOpponentBoard(player) {
+  const roll = state.openingRolls[player.id];
+  const card = document.createElement("section");
+  card.className = "table-felt rounded-4 p-3 opponent-board";
+  card.dataset.playerId = player.id;
+  card.setAttribute("aria-label", `${player.name} table`);
+
+  const title = document.createElement("div");
+  title.className = "opponent-board-name";
+  title.textContent = player.name;
+  card.appendChild(title);
+
+  [
+    { row: 4, label: "Row 4 · Second pair" },
+    { row: 3, label: "Row 3 · Pair or better" },
+    { row: 2, label: "Row 2 · Rolled dice" },
+  ].forEach(({ row, label }) => {
+    const boardRow = document.createElement("div");
+    boardRow.className = "board-row mb-2";
+    boardRow.dataset.row = String(row);
+
+    const rowLabel = document.createElement("div");
+    rowLabel.className = "board-row-label";
+    rowLabel.textContent = label;
+
+    const slots = document.createElement("div");
+    slots.className = "dice-slots";
+    appendRowSlots(slots, row, roll, true);
+
+    boardRow.append(rowLabel, slots);
+    card.appendChild(boardRow);
+  });
+
+  return card;
+}
+
+export function renderOpponentBoards() {
+  if (!els.opponentBoards) {
+    return;
+  }
+
+  els.opponentBoards.innerHTML = "";
+  const opponents = otherPlayers();
+  els.opponentBoards.hidden = opponents.length === 0;
+  opponents.forEach((player) => {
+    els.opponentBoards.appendChild(createOpponentBoard(player));
   });
 }
 

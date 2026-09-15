@@ -13,6 +13,18 @@ const els = {
   gamesBody: document.getElementById("lobby-games-body"),
   lobbyNav: document.getElementById("lobby-nav-btn"),
   readyModal: document.getElementById("lobby-ready-modal"),
+  readyTitle: document.getElementById("lobby-ready-title"),
+  readyBody: document.getElementById("lobby-ready-body"),
+  readyCancelBtn: document.getElementById("lobby-ready-cancel-btn"),
+  readyStartBtn: document.getElementById("lobby-ready-start-btn"),
+  readyCloseBtn: document.getElementById("lobby-ready-close-btn"),
+};
+
+const READY_COPY = {
+  title: "Game ready",
+  body: "All seats are filled. Start the game, or cancel to leave your seat.",
+  waitingTitle: "Waiting",
+  waitingBody: "Waiting other players...",
 };
 
 let readyModal = null;
@@ -81,11 +93,62 @@ export function renderLobbyGames(games) {
     .join("");
 }
 
+function resetReadyPopup() {
+  if (els.readyTitle) {
+    els.readyTitle.textContent = READY_COPY.title;
+  }
+  if (els.readyBody) {
+    els.readyBody.textContent = READY_COPY.body;
+  }
+  if (els.readyStartBtn) {
+    els.readyStartBtn.hidden = false;
+  }
+  setReadyBusy(false);
+}
+
 export function showSeatsFilledPopup() {
+  resetReadyPopup();
   lobbyReadyModal()?.show();
 }
 
-export function bindLobbyView({ onCreate, onRefresh, onPracticeTable, onBackToLobby }) {
+export function hideSeatsFilledPopup() {
+  lobbyReadyModal()?.hide();
+  resetReadyPopup();
+}
+
+export function setReadyBusy(busy) {
+  if (els.readyCancelBtn) {
+    els.readyCancelBtn.disabled = busy;
+  }
+  if (els.readyStartBtn) {
+    els.readyStartBtn.disabled = busy;
+  }
+}
+
+export function showReadyWaiting() {
+  if (els.readyTitle) {
+    els.readyTitle.textContent = READY_COPY.waitingTitle;
+  }
+  if (els.readyBody) {
+    els.readyBody.textContent = READY_COPY.waitingBody;
+  }
+  if (els.readyStartBtn) {
+    els.readyStartBtn.hidden = true;
+    els.readyStartBtn.disabled = true;
+  }
+  if (els.readyCancelBtn) {
+    els.readyCancelBtn.disabled = false;
+  }
+}
+
+export function bindLobbyView({
+  onCreate,
+  onRefresh,
+  onPracticeTable,
+  onBackToLobby,
+  onReadyCancel,
+  onReadyStart,
+}) {
   els.form.addEventListener("submit", (event) => {
     event.preventDefault();
     onCreate();
@@ -93,4 +156,7 @@ export function bindLobbyView({ onCreate, onRefresh, onPracticeTable, onBackToLo
   els.refreshBtn.addEventListener("click", () => onRefresh());
   els.practiceBtn.addEventListener("click", () => onPracticeTable());
   els.lobbyNav.addEventListener("click", () => onBackToLobby());
+  els.readyCancelBtn?.addEventListener("click", () => onReadyCancel?.());
+  els.readyCloseBtn?.addEventListener("click", () => onReadyCancel?.());
+  els.readyStartBtn?.addEventListener("click", () => onReadyStart?.());
 }

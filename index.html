@@ -159,11 +159,16 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title" id="lobby-ready-title">Game ready</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <button type="button" class="btn-close" id="lobby-ready-close-btn" aria-label="Close"></button>
           </div>
-          <div class="modal-body" id="lobby-ready-body">All seats are filled</div>
+          <div class="modal-body" id="lobby-ready-body">
+            All seats are filled. Start the game, or cancel to leave your seat.
+          </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-dark" data-bs-dismiss="modal">OK</button>
+            <button type="button" class="btn btn-outline-secondary" id="lobby-ready-cancel-btn">
+              Cancel
+            </button>
+            <button type="button" class="btn btn-dark" id="lobby-ready-start-btn">Start</button>
           </div>
         </div>
       </div>
@@ -174,6 +179,8 @@
       <div class="row g-4">
         <div class="col-lg-8">
           <p class="mb-3" id="turn-status">Starting game…</p>
+
+          <div id="opponent-boards" class="opponent-boards mb-3" hidden></div>
 
           <section class="table-felt rounded-4 p-3 p-md-4" aria-label="Play table">
             <div class="board-row board-row-drop mb-3" data-row="4">
@@ -278,6 +285,28 @@
       </div>
     </div>
     </div>
+    </div>
+
+    <div
+      class="modal fade"
+      id="session-expired-modal"
+      tabindex="-1"
+      data-bs-backdrop="static"
+      data-bs-keyboard="false"
+      aria-labelledby="session-expired-title"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="session-expired-title">Session expired</h5>
+          </div>
+          <div class="modal-body">Your session has expired. Please login again.</div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-dark" id="session-expired-ok-btn">OK</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script

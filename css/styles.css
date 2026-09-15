@@ -160,6 +160,44 @@ body {
   }
 }
 
+.opponent-boards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.opponent-board-name {
+  color: #fff;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.die-slot-compact {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.die-compact {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  padding: 5px;
+  box-shadow:
+    0 4px 0 #c9c0b5,
+    0 6px 10px rgba(0, 0, 0, 0.25);
+  cursor: default;
+}
+
+.die-compact .pip {
+  width: 6px;
+  height: 6px;
+}
+
+.die-compact:hover {
+  transform: none;
+}
+
 #ranking-table td:last-child,
 #ranking-table th:last-child {
   text-align: right;

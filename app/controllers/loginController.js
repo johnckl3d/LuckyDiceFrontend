@@ -1,12 +1,19 @@
-import { disconnectSockets, login } from "../services/apiService.js";
+import {
+  disconnectSockets,
+  isSessionExpiredError,
+  login,
+  setSessionExpiredHandler,
+} from "../services/apiService.js";
 import { clearSession, getSession } from "../models/loginModel.js";
 import {
   bindLoginView,
+  hideSessionExpiredPopup,
   readLoginForm,
   setLoginBusy,
   showApp,
   showLogin,
   showLoginError,
+  showSessionExpiredPopup,
 } from "../views/loginView.js";
 import { enterLobby, initLobbyController, leaveLobby } from "./lobbyController.js";
 
@@ -24,6 +31,9 @@ async function handleLogin() {
     showApp(session);
     enterLobby();
   } catch (error) {
+    if (isSessionExpiredError(error)) {
+      return;
+    }
     showLoginError(
       error.message === "Failed to fetch" ? "Could not reach the game engine." : error.message
     );
@@ -39,11 +49,23 @@ async function handleLogout() {
   showLogin();
 }
 
+function handleSessionExpired() {
+  leaveLobby();
+  showSessionExpiredPopup();
+}
+
+async function handleSessionExpiredOk() {
+  hideSessionExpiredPopup();
+  await handleLogout();
+}
+
 export function initLoginController() {
   initLobbyController();
+  setSessionExpiredHandler(handleSessionExpired);
   bindLoginView({
     onSubmit: handleLogin,
     onLogout: handleLogout,
+    onSessionExpiredOk: handleSessionExpiredOk,
   });
 
   const existingSession = getSession();

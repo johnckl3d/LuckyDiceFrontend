@@ -8,7 +8,16 @@ const loginEls = {
   submit: document.getElementById("login-submit"),
   signedInUser: document.getElementById("signed-in-user"),
   logout: document.getElementById("logout-btn"),
+  sessionExpiredModal: document.getElementById("session-expired-modal"),
+  sessionExpiredOk: document.getElementById("session-expired-ok-btn"),
 };
+
+function sessionExpiredModalInstance() {
+  if (!loginEls.sessionExpiredModal) {
+    return null;
+  }
+  return bootstrap.Modal.getOrCreateInstance(loginEls.sessionExpiredModal);
+}
 
 export function showLoginError(message) {
   loginEls.error.textContent = message;
@@ -40,10 +49,19 @@ export function showLogin() {
   loginEls.userId.focus();
 }
 
-export function bindLoginView({ onSubmit, onLogout }) {
+export function showSessionExpiredPopup() {
+  sessionExpiredModalInstance()?.show();
+}
+
+export function hideSessionExpiredPopup() {
+  sessionExpiredModalInstance()?.hide();
+}
+
+export function bindLoginView({ onSubmit, onLogout, onSessionExpiredOk }) {
   loginEls.form.addEventListener("submit", (event) => {
     event.preventDefault();
     onSubmit();
   });
   loginEls.logout.addEventListener("click", () => onLogout());
+  loginEls.sessionExpiredOk?.addEventListener("click", () => onSessionExpiredOk?.());
 }

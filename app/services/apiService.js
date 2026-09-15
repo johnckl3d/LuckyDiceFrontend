@@ -15,6 +15,39 @@ const connections = {
 
 let lobbyToken = "";
 let lobbyNotificationHandlers = null;
+let gameNotificationHandlers = null;
+let sessionExpiredHandler = null;
+let sessionExpiredNotified = false;
+
+export const SESSION_EXPIRED_MESSAGE = "Your session has expired. Please login again.";
+
+export function setSessionExpiredHandler(handler) {
+  sessionExpiredHandler = handler;
+}
+
+export function resetSessionExpiredNotice() {
+  sessionExpiredNotified = false;
+}
+
+export function isSessionExpiredError(error) {
+  const message = String(error?.message ?? error ?? "");
+  return (
+    message === SESSION_EXPIRED_MESSAGE ||
+    /Status code '401'|Unauthorized|Session expired/i.test(message)
+  );
+}
+
+function isUnauthorizedMessage(raw) {
+  return /Status code '401'|Unauthorized/i.test(raw);
+}
+
+function notifySessionExpired() {
+  if (sessionExpiredNotified || !getSession()) {
+    return;
+  }
+  sessionExpiredNotified = true;
+  sessionExpiredHandler?.();
+}
 
 function signalRLib() {
   const lib = window.signalR;
@@ -27,11 +60,13 @@ function signalRLib() {
 function hubError(error) {
   const raw = String(error?.message ?? error ?? "Socket request failed");
   const match = raw.match(/HubException:\s*([\s\S]+)$/i);
-  if (match) {
-    return new Error(match[1].trim());
+  const message = match ? match[1].trim() : raw;
+  if (isUnauthorizedMessage(raw) || isUnauthorizedMessage(message)) {
+    notifySessionExpired();
+    return new Error(SESSION_EXPIRED_MESSAGE);
   }
-  if (/Status code '401'|Unauthorized/i.test(raw)) {
-    return new Error("Session expired. Please log in again.");
+  if (match) {
+    return new Error(message);
   }
   if (/Failed to (start|fetch)|WebSocket failed|negotiate|ERR_CONNECTION/i.test(raw)) {
     return new Error("Could not reach the game engine.");
@@ -96,7 +131,8 @@ async function ensureConnection(key, path, withAccessToken = false) {
   if (withAccessToken) {
     const token = getSession()?.accessToken ?? "";
     if (!token) {
-      throw new Error("Unauthorized");
+      notifySessionExpired();
+      throw new Error(SESSION_EXPIRED_MESSAGE);
     }
     if (connections[key] && lobbyToken !== token) {
       await stopConnection(key);
@@ -105,11 +141,19 @@ async function ensureConnection(key, path, withAccessToken = false) {
 
   if (!connections[key]) {
     connections[key] = buildConnection(path, withAccessToken);
+    connections[key].onclose((error) => {
+      if (error && isUnauthorizedMessage(String(error?.message ?? error))) {
+        notifySessionExpired();
+      }
+    });
     if (withAccessToken) {
       lobbyToken = getSession()?.accessToken ?? "";
     }
     if (key === "lobby") {
       bindLobbyNotificationHandlers(connections[key]);
+    }
+    if (key === "game") {
+      bindGameNotificationHandlers(connections[key]);
     }
   }
 
@@ -145,6 +189,7 @@ export async function login(userId, password) {
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
   });
+  resetSessionExpiredNotice();
   return getSession();
 }
 
@@ -159,12 +204,31 @@ export async function pingEngine() {
 
 function bindLobbyNotificationHandlers(connection) {
   connection.off("lobbyUpdated");
-  connection.off("gameReady");
+  connection.off("tableReady");
+  connection.off("gameStarted");
+  connection.off("openingRolled");
+  connection.off("OpeningRolled");
   if (lobbyNotificationHandlers?.onUpdated) {
     connection.on("lobbyUpdated", lobbyNotificationHandlers.onUpdated);
   }
   if (lobbyNotificationHandlers?.onReady) {
-    connection.on("gameReady", lobbyNotificationHandlers.onReady);
+    connection.on("tableReady", lobbyNotificationHandlers.onReady);
+  }
+  if (lobbyNotificationHandlers?.onStarted) {
+    connection.on("gameStarted", lobbyNotificationHandlers.onStarted);
+  }
+  if (lobbyNotificationHandlers?.onOpeningRolled) {
+    connection.on("openingRolled", lobbyNotificationHandlers.onOpeningRolled);
+    connection.on("OpeningRolled", lobbyNotificationHandlers.onOpeningRolled);
+  }
+}
+
+function bindGameNotificationHandlers(connection) {
+  connection.off("openingRolled");
+  connection.off("OpeningRolled");
+  if (gameNotificationHandlers?.onOpeningRolled) {
+    connection.on("openingRolled", gameNotificationHandlers.onOpeningRolled);
+    connection.on("OpeningRolled", gameNotificationHandlers.onOpeningRolled);
   }
 }
 
@@ -174,12 +238,26 @@ export async function subscribeLobbyNotifications(handlers) {
   bindLobbyNotificationHandlers(connection);
 }
 
+export async function subscribeGameNotifications(handlers) {
+  gameNotificationHandlers = handlers;
+  const connection = await ensureConnection("game", "/hubs/game", true);
+  bindGameNotificationHandlers(connection);
+}
+
 export async function listLobbyGames() {
   return invoke("lobby", "/hubs/lobby", "ListGames", [], true);
 }
 
 export async function createLobbyGame(payload) {
   return invoke("lobby", "/hubs/lobby", "CreateGame", [payload], true);
+}
+
+export async function sendPlayerResponse(gameId, response) {
+  return invoke("lobby", "/hubs/lobby", "playerReady", [{ gameId, response }], true);
+}
+
+export async function leaveLobbyGame(gameId) {
+  return invoke("lobby", "/hubs/lobby", "LeaveGame", [gameId], true);
 }
 
 export async function startGame(players) {

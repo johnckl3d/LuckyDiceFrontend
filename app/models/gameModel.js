@@ -1,3 +1,5 @@
+import { getSession } from "./loginModel.js";
+
 export const state = {
   gameId: null,
   players: [],
@@ -12,7 +14,51 @@ export const state = {
   secondsLeft: 0,
   ranking: [],
   lastHandName: null,
+  openingRolls: {},
 };
+
+export function normalizePlayer(player) {
+  return {
+    id: player.id ?? player.playerId ?? player.userId,
+    name: player.name ?? player.playerName ?? player.playerId ?? player.id ?? "Player",
+    kind: player.kind ?? "human",
+  };
+}
+
+export function playerMatches(player, userId) {
+  if (!player || userId == null || userId === "") {
+    return false;
+  }
+  return [player.id, player.playerId, player.userId, player.name].some(
+    (value) => String(value) === String(userId)
+  );
+}
+
+export function localPlayerId() {
+  const sessionId = getSession()?.userId;
+  if (sessionId && state.players.some((player) => playerMatches(player, sessionId))) {
+    const match = state.players.find((player) => playerMatches(player, sessionId));
+    return match.id;
+  }
+  const human = state.players.find((player) => player.id === "p-human");
+  return human?.id ?? sessionId ?? null;
+}
+
+export function otherPlayers() {
+  const selfId = localPlayerId();
+  return state.players.filter((player) => player.id !== selfId);
+}
+
+export function setOpeningRoll(playerId, values, placements) {
+  if (!playerId) {
+    return;
+  }
+  const faces = values.slice(0, 5);
+  state.openingRolls[playerId] = {
+    values: faces,
+    placements: (Array.isArray(placements) ? placements : faces.map(() => 2)).slice(0, 5),
+  };
+}
 
 export function defaultPlayers(seatCount) {
   const players = [{ id: "p-human", name: "You", kind: "human" }];
