@@ -196,6 +196,9 @@ export function getSeatCount() {
 }
 
 export function renderPlayers() {
+  // #region agent log
+  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'post-fix',hypothesisId:'E',location:'gameView.js:renderPlayers',message:'renderPlayers called',data:{playerListExists:Boolean(els.playerList),gameScreenHidden:document.getElementById('game-screen')?.hidden,playerCount:state.players.length,players:state.players,kinds:state.players.map((p)=>p.kind)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   els.playerList.innerHTML = "";
   state.players.forEach((player) => {
     const item = document.createElement("li");
@@ -217,6 +220,9 @@ export function renderPlayers() {
     item.append(name, badge);
     els.playerList.appendChild(item);
   });
+  // #region agent log
+  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'post-fix',hypothesisId:'D',location:'gameView.js:renderPlayers:after',message:'player-list DOM after render',data:{childCount:els.playerList?.children?.length??null,innerText:els.playerList?.innerText??null,opponentCount:document.getElementById('opponent-boards')?.children?.length??null,opponentHidden:document.getElementById('opponent-boards')?.hidden},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   renderOpponentBoards();
 }
 

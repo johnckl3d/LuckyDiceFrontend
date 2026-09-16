@@ -18,11 +18,23 @@ export const state = {
 };
 
 export function normalizePlayer(player) {
-  return {
+  const aiFlag = Boolean(player.isAi ?? player.IsAi);
+  const kindRaw = player.kind ?? player.Kind;
+  const kind =
+    typeof kindRaw === "string" && kindRaw
+      ? kindRaw.toLowerCase()
+      : aiFlag
+        ? "ai"
+        : "human";
+  const normalized = {
     id: player.id ?? player.playerId ?? player.userId,
-    name: player.name ?? player.playerName ?? player.playerId ?? player.id ?? "Player",
-    kind: player.kind ?? "human",
+    name: player.name ?? player.playerName ?? player.playerId ?? player.id ?? (kind === "ai" ? "AI" : "Player"),
+    kind,
   };
+  // #region agent log
+  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'pre-fix',hypothesisId:'C',location:'gameModel.js:normalizePlayer',message:'normalizePlayer in/out',data:{inputKeys:player?Object.keys(player):[],input:{id:player?.id,playerId:player?.playerId,userId:player?.userId,name:player?.name,kind:player?.kind,Kind:player?.Kind,isAi:player?.isAi,IsAi:player?.IsAi,type:player?.type,Type:player?.Type},normalized},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  return normalized;
 }
 
 export function playerMatches(player, userId) {

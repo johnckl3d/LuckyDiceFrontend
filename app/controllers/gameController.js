@@ -374,9 +374,13 @@ function applyStartedGame(started) {
   renderRanking();
 
   state.gameId = started.gameId;
-  state.players = (started.players ?? []).map(normalizePlayer);
+  const rawPlayers = started.players ?? [];
+  state.players = rawPlayers.map(normalizePlayer);
   state.currentPlayerId = started.currentPlayerId;
   resetBoard();
+  // #region agent log
+  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'post-fix',hypothesisId:'B',location:'gameController.js:applyStartedGame',message:'applyStartedGame players',data:{startedKeys:started?Object.keys(started):[],rawCount:rawPlayers.length,startedPlayers:started.players,startedPlayersPascal:started.Players,normalized:state.players,currentPlayerId:state.currentPlayerId},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   renderPlayers();
 }
 
@@ -521,7 +525,10 @@ export async function enterGame(started) {
 
   applyStartedGame({ ...started, gameId });
   try {
-    await joinGame(gameId);
+    const joined = await joinGame(gameId);
+    // #region agent log
+    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'post-fix',hypothesisId:'A',location:'gameController.js:enterGame',message:'joinGame return vs state.players',data:{joinedType:typeof joined,joinedKeys:joined&&typeof joined==='object'?Object.keys(joined):[],joinedPlayers:joined?.players??joined?.Players??joined,statePlayers:state.players,stateCount:state.players.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     setStatus("Game started. Waiting for opening roll…");
   } catch (error) {
     if (!isSessionExpiredError(error)) {
