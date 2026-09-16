@@ -230,9 +230,51 @@ function bindLobbyNotificationHandlers(connection) {
 function bindGameNotificationHandlers(connection) {
   connection.off("openingRolled");
   connection.off("OpeningRolled");
+  connection.off("openingTally");
+  connection.off("OpeningTally");
+  connection.off("challenge1Select");
+  connection.off("Challenge1Select");
+  connection.off("challenge1Reroll1");
+  connection.off("Challenge1Reroll1");
+  connection.off("challenge1RSelect2");
+  connection.off("Challenge1RSelect2");
+  connection.off("challenge1Reroll2");
+  connection.off("Challenge1Reroll2");
+  connection.off("challengeResolve");
+  connection.off("ChallengeResolve");
+  connection.off("gameDetails");
+  connection.off("GameDetails");
   if (gameNotificationHandlers?.onOpeningRolled) {
     connection.on("openingRolled", gameNotificationHandlers.onOpeningRolled);
     connection.on("OpeningRolled", gameNotificationHandlers.onOpeningRolled);
+  }
+  if (gameNotificationHandlers?.onOpeningTally) {
+    connection.on("openingTally", gameNotificationHandlers.onOpeningTally);
+    connection.on("OpeningTally", gameNotificationHandlers.onOpeningTally);
+  }
+  if (gameNotificationHandlers?.onChallenge1Select) {
+    connection.on("challenge1Select", gameNotificationHandlers.onChallenge1Select);
+    connection.on("Challenge1Select", gameNotificationHandlers.onChallenge1Select);
+  }
+  if (gameNotificationHandlers?.onChallenge1Reroll1) {
+    connection.on("challenge1Reroll1", gameNotificationHandlers.onChallenge1Reroll1);
+    connection.on("Challenge1Reroll1", gameNotificationHandlers.onChallenge1Reroll1);
+  }
+  if (gameNotificationHandlers?.onChallenge1RSelect2) {
+    connection.on("challenge1RSelect2", gameNotificationHandlers.onChallenge1RSelect2);
+    connection.on("Challenge1RSelect2", gameNotificationHandlers.onChallenge1RSelect2);
+  }
+  if (gameNotificationHandlers?.onChallenge1Reroll2) {
+    connection.on("challenge1Reroll2", gameNotificationHandlers.onChallenge1Reroll2);
+    connection.on("Challenge1Reroll2", gameNotificationHandlers.onChallenge1Reroll2);
+  }
+  if (gameNotificationHandlers?.onChallengeResolve) {
+    connection.on("challengeResolve", gameNotificationHandlers.onChallengeResolve);
+    connection.on("ChallengeResolve", gameNotificationHandlers.onChallengeResolve);
+  }
+  if (gameNotificationHandlers?.onGameDetails) {
+    connection.on("gameDetails", gameNotificationHandlers.onGameDetails);
+    connection.on("GameDetails", gameNotificationHandlers.onGameDetails);
   }
 }
 
@@ -278,6 +320,18 @@ export async function rollDice(payload) {
 
 export async function submitHand(payload) {
   return invoke("game", "/hubs/game", "Submit", [payload]);
+}
+
+export async function arrangeOpening(payload) {
+  return invoke("game", "/hubs/game", "openingArrange", [payload], true);
+}
+
+export async function openingTally(payload) {
+  return invoke("game", "/hubs/game", "openingTally", [payload], true);
+}
+
+export async function sendChallenge1Reroll1(payload) {
+  return invoke("game", "/hubs/game", "challenge1Reroll1", [payload], true);
 }
 
 export async function tallyHands(payload) {

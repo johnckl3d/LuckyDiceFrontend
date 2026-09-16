@@ -12,9 +12,13 @@ export const state = {
   reroll: [false, false, false, false, false],
   phase: "idle",
   secondsLeft: 0,
+  turnTime: 0,
+  stake: null,
   ranking: [],
   lastHandName: null,
   openingRolls: {},
+  loserId: null,
+  awaitingOpeningTallyAck: false,
 };
 
 export function normalizePlayer(player) {
@@ -26,15 +30,11 @@ export function normalizePlayer(player) {
       : aiFlag
         ? "ai"
         : "human";
-  const normalized = {
+  return {
     id: player.id ?? player.playerId ?? player.userId,
     name: player.name ?? player.playerName ?? player.playerId ?? player.id ?? (kind === "ai" ? "AI" : "Player"),
     kind,
   };
-  // #region agent log
-  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'pre-fix',hypothesisId:'C',location:'gameModel.js:normalizePlayer',message:'normalizePlayer in/out',data:{inputKeys:player?Object.keys(player):[],input:{id:player?.id,playerId:player?.playerId,userId:player?.userId,name:player?.name,kind:player?.kind,Kind:player?.Kind,isAi:player?.isAi,IsAi:player?.IsAi,type:player?.type,Type:player?.Type},normalized},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-  return normalized;
 }
 
 export function playerMatches(player, userId) {
@@ -72,6 +72,30 @@ export function setOpeningRoll(playerId, values, placements) {
   };
 }
 
+export function setOpeningArrangement(playerId, rows) {
+  if (!playerId) {
+    return;
+  }
+
+  const values = [];
+  const placements = [];
+  const add = (faces, row) => {
+    (Array.isArray(faces) ? faces : []).forEach((face) => {
+      const value = Number(face);
+      if (value >= 1 && value <= 6 && values.length < 5) {
+        values.push(value);
+        placements.push(row);
+      }
+    });
+  };
+
+  add(rows?.row1, 3);
+  add(rows?.row2, 4);
+  add(rows?.unarranged, 2);
+
+  state.openingRolls[playerId] = { values, placements };
+}
+
 export function defaultPlayers(seatCount) {
   const players = [{ id: "p-human", name: "You", kind: "human" }];
   for (let extra = 2; extra < seatCount; extra += 1) {
@@ -93,7 +117,22 @@ export function isHumanTurn() {
   return currentPlayer()?.kind === "human";
 }
 
+export function isLocalPlayer(playerId) {
+  const selfId = localPlayerId();
+  if (playerId == null || playerId === "" || !selfId) {
+    return false;
+  }
+  if (String(selfId) === String(playerId)) {
+    return true;
+  }
+  const self = state.players.find((player) => playerMatches(player, selfId));
+  return playerMatches(self ?? { id: selfId }, playerId);
+}
+
 export function canDrag() {
+  if (state.phase === "challenge1-select") {
+    return isLocalPlayer(state.loserId);
+  }
   return state.phase === "arrange" && isHumanTurn();
 }
 
@@ -136,6 +175,18 @@ export function toggleReroll(index) {
 }
 
 export function tryPlace(indices, row) {
+  if (state.phase === "challenge1-select") {
+    let changed = false;
+    indices.forEach((index) => {
+      if (row === 2 || row === 3 || row === 4) {
+        state.placements[index] = row;
+        changed = true;
+      }
+    });
+    state.selected.clear();
+    return { changed, invalidDrop: !changed };
+  }
+
   const allowed =
     row === 3 ? state.allowedDrops.row3 : row === 4 ? state.allowedDrops.row4 : null;
 

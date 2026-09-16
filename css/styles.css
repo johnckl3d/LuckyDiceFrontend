@@ -66,6 +66,32 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+#opening-tally-actions:not([hidden]),
+#challenge-wait-message:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+#challenge-wait-message:not([hidden]) {
+  color: #fff;
+}
+
+#board-actions-controls:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+#board-actions-controls[hidden] {
+  display: none !important;
+}
+
 .timer-digits {
   font-size: 1.75rem;
   line-height: 1;

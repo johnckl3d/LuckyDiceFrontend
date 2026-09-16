@@ -52,8 +52,8 @@ async function handleCreate() {
     showLobbyError("Players must be between 2 and 8.");
     return;
   }
-  if (body.turnTime < 1) {
-    showLobbyError("Turn time must be at least 1 second.");
+  if (body.turnTime !== 30 && body.turnTime !== 300) {
+    showLobbyError("Turn time must be 30 or 300 seconds.");
     return;
   }
   if (body.stake < 0) {
@@ -158,9 +158,6 @@ function readGameId(value) {
 }
 
 async function handleTableStarted(payload) {
-  // #region agent log
-  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'pre-fix',hypothesisId:'B',location:'lobbyController.js:handleTableStarted',message:'tableStarted payload',data:{payloadType:typeof payload,keys:payload&&typeof payload==='object'?Object.keys(payload):[],gameId:payload?.gameId??payload?.GameId,playerCount:(payload?.players??payload?.Players??[]).length,players:payload?.players??payload?.Players??null,rawPreview:typeof payload==='string'?payload.slice(0,400):null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   const gameId = readGameId(payload) || lastReadyGameId;
   hideSeatsFilledPopup();
   lastReadyGameId = "";

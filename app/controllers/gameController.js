@@ -1,8 +1,11 @@
 import {
+  arrangeOpening,
   isSessionExpiredError,
   joinGame,
+  openingTally,
   pingEngine,
   rollDice,
+  sendChallenge1Reroll1,
   startGame,
   submitHand,
   subscribeGameNotifications,
@@ -15,12 +18,14 @@ import {
   currentPlayer,
   defaultPlayers,
   isHumanTurn,
+  isLocalPlayer,
   normalizePlayer,
   localPlayerId,
   playerById,
   playerMatches,
   resetBoard,
   revertInvalidPlacements,
+  setOpeningArrangement,
   setOpeningRoll,
   standingValues,
   state,
@@ -39,6 +44,8 @@ import {
   renderRanking,
   setEngineStatus,
   setRankingNote,
+  setStakeDisplay,
+  setOpeningTallyOkBusy,
   setStatus,
   setTimerDisplay,
   showGameScreen,
@@ -47,6 +54,11 @@ import {
 
 let timerId = null;
 let gameReady = false;
+let gamePhase = null;
+
+function setGamePhase(eventName) {
+  gamePhase = eventName;
+}
 
 function clearTimer() {
   if (timerId !== null) {
@@ -55,13 +67,19 @@ function clearTimer() {
   }
 }
 
+function turnDuration() {
+  const seconds = Number(state.turnTime);
+  return seconds > 0 ? seconds : TIMER_SECONDS;
+}
+
 function startArrangeTimer() {
   clearTimer();
-  state.secondsLeft = TIMER_SECONDS;
-  setTimerDisplay(state.secondsLeft, TIMER_SECONDS);
+  const total = turnDuration();
+  state.secondsLeft = total;
+  setTimerDisplay(state.secondsLeft, total);
   timerId = window.setInterval(async () => {
     state.secondsLeft -= 1;
-    setTimerDisplay(state.secondsLeft, TIMER_SECONDS);
+    setTimerDisplay(state.secondsLeft, turnDuration());
     if (state.secondsLeft <= 0) {
       clearTimer();
       await submitCurrentBoard();
@@ -147,7 +165,7 @@ async function takeRoll(held) {
   if (isHumanTurn()) {
     state.phase = "arrange";
     setStatus(
-      `Round ${state.round} · Your turn · ${result.handName}. Drag a pair to row 3 (second pair to row 4), then submit.`
+      `Round ${state.round} · Your turn · ${result.handName}. Drag a pair to row1 (second pair to row2), then submit.`
     );
     renderPlayers();
     renderBoard();
@@ -159,7 +177,7 @@ async function takeRoll(held) {
 
 async function handleInstantWin(result) {
   clearTimer();
-  setTimerDisplay(null, TIMER_SECONDS);
+  setTimerDisplay(null, turnDuration());
   state.phase = "game-over";
   const winner = currentPlayer();
   state.ranking = [
@@ -179,6 +197,132 @@ async function handleInstantWin(result) {
   showResult("Instant win", `${winner.name}: sequence 1-2-3-4-5. That wins the game.`);
 }
 
+function openingArrangePayload(target) {
+  const row1 = [];
+  const row2 = [];
+  const unarranged = [];
+  state.values.forEach((face, index) => {
+    const row = state.placements[index];
+    const value = String(face);
+    if (row === 3) {
+      row1.push(value);
+    } else if (row === 4) {
+      row2.push(value);
+    } else {
+      unarranged.push(value);
+    }
+  });
+  return { gameId: state.gameId, target, row1, row2, unarranged };
+}
+
+function restoreArrangeAfterReject(message) {
+  revertInvalidPlacements();
+  state.phase = "arrange";
+  setStatus(message);
+  renderBoard();
+  if (isHumanTurn()) {
+    startArrangeTimer();
+  }
+}
+
+async function handleSubmit() {
+  if (state.phase === "challenge1-select") {
+    await submitChallenge1Select();
+    return;
+  }
+  await submitOpeningArrange();
+}
+
+async function submitChallenge1Select() {
+  if (state.phase !== "challenge1-select" || !isLocalPlayer(state.loserId)) {
+    return;
+  }
+
+  clearTimer();
+  state.phase = "submitting";
+  setTimerDisplay(0, turnDuration());
+  renderBoard();
+
+  let response;
+  try {
+    response = await sendChallenge1Reroll1(openingArrangePayload("challenge1Reroll1"));
+  } catch (error) {
+    if (isSessionExpiredError(error)) {
+      return;
+    }
+    state.phase = "challenge1-select";
+    setStatus(error.message || "Submit was rejected.");
+    renderBoard();
+    return;
+  }
+
+  if (response && response.accepted === false) {
+    state.phase = "challenge1-select";
+    setStatus(response.error || "Submit was rejected.");
+    renderBoard();
+    return;
+  }
+
+  const selfId = localPlayerId();
+  if (selfId) {
+    setOpeningArrangement(selfId, openingArrangePayload("challenge1Reroll1"));
+  }
+  state.selected.clear();
+  state.phase = "waiting";
+  setStatus("Arrangement submitted. Waiting for other players…");
+  renderBoard();
+}
+
+async function submitOpeningArrange() {
+  if (state.phase !== "arrange" || state.round !== 1) {
+    await submitCurrentBoard();
+    return;
+  }
+
+  clearTimer();
+  state.phase = "submitting";
+  setTimerDisplay(0, turnDuration());
+  renderBoard();
+
+  let response;
+  try {
+    response = await arrangeOpening(openingArrangePayload("openingArrange"));
+  } catch (error) {
+    if (isSessionExpiredError(error)) {
+      return;
+    }
+    restoreArrangeAfterReject(error.message || "Submit was rejected.");
+    return;
+  }
+
+  if (response && response.accepted === false) {
+    restoreArrangeAfterReject(response.error || "Submit was rejected.");
+    return;
+  }
+
+  state.lastHandName = response?.handName ?? state.lastHandName;
+  state.selected.clear();
+  if (
+    state.phase === "opening-tally" ||
+    state.phase === "challenge1-wait" ||
+    state.phase === "challenge1-select"
+  ) {
+    return;
+  }
+  state.phase = "waiting";
+  setStatus("Arrangement submitted. Waiting for other players…");
+  renderBoard();
+
+  if (state.round === 1 && response?.roundComplete) {
+    await finishRound1();
+    return;
+  }
+
+  if (response?.nextPlayerId) {
+    await startTurn(response.nextPlayerId);
+  }
+}
+
 async function submitCurrentBoard() {
   if (state.phase !== "arrange") {
     return;
@@ -186,7 +330,7 @@ async function submitCurrentBoard() {
 
   clearTimer();
   state.phase = "submitting";
-  setTimerDisplay(0, TIMER_SECONDS);
+  setTimerDisplay(0, turnDuration());
   renderBoard();
 
   const response = await submitHand({
@@ -269,7 +413,7 @@ async function startTurn(playerId) {
   resetBoard(state.round === 2 ? standingValues(playerId) : [1, 1, 1, 1, 1]);
   renderPlayers();
   clearTimer();
-  setTimerDisplay(null, TIMER_SECONDS);
+  setTimerDisplay(null, turnDuration());
 
   const player = currentPlayer();
   if (player.kind === "ai") {
@@ -319,12 +463,17 @@ async function runAiTurn() {
 async function newGame() {
   clearTimer();
   hideResult();
-  setTimerDisplay(null, TIMER_SECONDS);
+  setTimerDisplay(null, turnDuration());
   state.ranking = [];
   state.round = 1;
   state.phase = "idle";
   state.selected.clear();
   state.openingRolls = {};
+  state.loserId = null;
+  state.awaitingOpeningTallyAck = false;
+  state.turnTime = 0;
+  state.stake = null;
+  setStakeDisplay(null);
   setRankingNote("After everyone submits round 1, the lowest hand rolls in round 2.");
   renderRanking();
 
@@ -358,30 +507,40 @@ async function handleReroll() {
 export function leaveGame() {
   clearTimer();
   hideResult();
+  state.awaitingOpeningTallyAck = false;
+  state.loserId = null;
+  renderBoard();
   showGameScreen(false);
 }
 
 function applyStartedGame(started) {
+  const sameGame = started.gameId && String(state.gameId) === String(started.gameId);
+  const preservedTurnTime = sameGame ? state.turnTime : 0;
+  const preservedStake = sameGame ? state.stake : null;
+
   clearTimer();
   hideResult();
-  setTimerDisplay(null, TIMER_SECONDS);
+  setTimerDisplay(null, turnDuration());
   state.ranking = [];
   state.round = started.round ?? 1;
   state.phase = "idle";
   state.selected.clear();
   state.openingRolls = {};
+  state.loserId = null;
+  state.awaitingOpeningTallyAck = false;
+  state.turnTime = preservedTurnTime;
+  state.stake = preservedStake;
+  setStakeDisplay(preservedStake);
   setRankingNote("After everyone submits round 1, the lowest hand rolls in round 2.");
   renderRanking();
 
   state.gameId = started.gameId;
-  const rawPlayers = started.players ?? [];
-  state.players = rawPlayers.map(normalizePlayer);
+  state.players = (started.players ?? []).map(normalizePlayer);
   state.currentPlayerId = started.currentPlayerId;
   resetBoard();
-  // #region agent log
-  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'post-fix',hypothesisId:'B',location:'gameController.js:applyStartedGame',message:'applyStartedGame players',data:{startedKeys:started?Object.keys(started):[],rawCount:rawPlayers.length,startedPlayers:started.players,startedPlayersPascal:started.Players,normalized:state.players,currentPlayerId:state.currentPlayerId},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   renderPlayers();
+  renderBoard();
+  applyGameDetails(started);
 }
 
 function pick(object, names) {
@@ -444,11 +603,252 @@ function normalizeOpeningRolled(payload) {
     .filter((item) => item.playerId && item.values.length);
 }
 
+export function applyGameDetails(payload) {
+  const data = parseJsonPayload(payload);
+  if (!data || typeof data !== "object") {
+    return;
+  }
+
+  const gameId = pick(data, ["gameId", "GameId"]);
+  if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
+    return;
+  }
+  if (gameId && !state.gameId) {
+    state.gameId = gameId;
+  }
+
+  const turnTime = Number(pick(data, ["turnTime", "TurnTime"]));
+  if (Number.isFinite(turnTime) && turnTime > 0) {
+    state.turnTime = turnTime;
+    if (timerId !== null && state.phase === "arrange") {
+      startArrangeTimer();
+    }
+  }
+
+  const stake = pick(data, ["stake", "Stake"]);
+  if (stake != null) {
+    state.stake = stake;
+    setStakeDisplay(stake);
+  }
+}
+
+function normalizeRowFaces(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.map(String);
+}
+
+function normalizeOpeningTally(payload) {
+  const data = parseJsonPayload(payload);
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
+  const tally = data.tally && typeof data.tally === "object" ? data.tally : {};
+  const sourcePlayers = Array.isArray(data.players)
+    ? data.players
+    : Array.isArray(tally.ranking)
+      ? tally.ranking
+      : [];
+
+  const players = sourcePlayers
+    .map((item) => {
+      const playerId = pick(item, ["playerId", "PlayerId", "id", "Id", "userId", "UserId"]);
+      if (!playerId) {
+        return null;
+      }
+      return {
+        playerId,
+        row1: normalizeRowFaces(pick(item, ["row1", "Row1"])),
+        row2: normalizeRowFaces(pick(item, ["row2", "Row2"])),
+        unarranged: normalizeRowFaces(pick(item, ["unarranged", "Unarranged"])),
+        values: pick(item, ["values", "Values"]),
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    gameId: pick(data, ["gameId", "GameId"]) ?? pick(tally, ["gameId", "GameId"]),
+    phase: pick(data, ["phase", "Phase"]) ?? pick(tally, ["phase", "Phase"]),
+    currentPlayerId:
+      pick(data, ["currentPlayerId", "CurrentPlayerId"]) ??
+      pick(tally, ["currentPlayerId", "CurrentPlayerId"]),
+    loserId: pick(data, ["loserId", "LoserId"]) ?? pick(tally, ["loserId", "LoserId"]),
+    ranking: Array.isArray(tally.ranking) ? tally.ranking : Array.isArray(data.ranking) ? data.ranking : [],
+    nextPlayerId: pick(tally, ["nextPlayerId", "NextPlayerId"]) ?? pick(data, ["nextPlayerId", "NextPlayerId"]),
+    players,
+  };
+}
+
+function applyTallyArrangements(tally) {
+  const selfId = localPlayerId();
+  tally.players.forEach((entry) => {
+    const player = state.players.find((item) => playerMatches(item, entry.playerId));
+    const playerId = player?.id ?? entry.playerId;
+    const hasRows = entry.row1.length || entry.row2.length || entry.unarranged.length;
+    if (hasRows) {
+      setOpeningArrangement(playerId, entry);
+      if (String(playerId) !== String(entry.playerId)) {
+        setOpeningArrangement(entry.playerId, entry);
+      }
+    } else {
+      const faces = parseDiceValues(entry.values);
+      if (faces.length) {
+        setOpeningRoll(playerId, faces);
+        if (String(playerId) !== String(entry.playerId)) {
+          setOpeningRoll(entry.playerId, faces);
+        }
+      }
+    }
+
+    const isLocal =
+      (selfId && String(playerId) === String(selfId)) ||
+      (player && playerMatches(player, selfId));
+    if (isLocal) {
+      const roll = state.openingRolls[playerId] ?? state.openingRolls[entry.playerId];
+      if (roll) {
+        state.values = roll.values.slice();
+        state.placements = roll.placements.slice();
+      }
+    }
+  });
+}
+
+export function applyOpeningTally(payload) {
+  setGamePhase("openingTally");
+  const tally = normalizeOpeningTally(payload);
+  if (!tally) {
+    return;
+  }
+
+  const gameId = tally.gameId;
+  if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
+    return;
+  }
+  if (gameId && !state.gameId) {
+    state.gameId = gameId;
+  }
+
+  clearTimer();
+  setTimerDisplay(null, turnDuration());
+  state.selected.clear();
+  state.phase = "opening-tally";
+  state.awaitingOpeningTallyAck = true;
+  state.loserId = tally.loserId ?? null;
+  if (tally.ranking.length) {
+    state.ranking = tally.ranking;
+    renderRanking();
+  }
+  if (tally.phase != null) {
+    const phase = Number(tally.phase);
+    if (Number.isFinite(phase) && phase > 0) {
+      state.round = phase;
+    }
+  }
+  if (tally.currentPlayerId) {
+    state.currentPlayerId = tally.currentPlayerId;
+  }
+
+  applyTallyArrangements(tally);
+
+  const loser = playerById(state.loserId) ?? state.players.find((player) => playerMatches(player, state.loserId));
+  const loserLabel = loser?.name ?? state.loserId ?? "unknown";
+  setRankingNote(`${loserLabel} ranked last.`);
+  setStatus(`Opening tally complete. Loser: ${state.loserId ?? loserLabel}. Confirm to continue.`);
+  renderPlayers();
+  renderOpponentBoards();
+  renderBoard();
+}
+
+export function applyChallenge1Select(payload) {
+  setGamePhase("challenge1Select");
+  const tally = normalizeOpeningTally(payload);
+  if (!tally) {
+    return;
+  }
+
+  const gameId = tally.gameId;
+  if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
+    return;
+  }
+  if (gameId && !state.gameId) {
+    state.gameId = gameId;
+  }
+
+  clearTimer();
+  setTimerDisplay(null, turnDuration());
+  state.selected.clear();
+  state.awaitingOpeningTallyAck = false;
+  state.loserId = tally.loserId ?? null;
+  if (tally.ranking.length) {
+    state.ranking = tally.ranking;
+    renderRanking();
+  }
+  if (tally.phase != null) {
+    const phase = Number(tally.phase);
+    if (Number.isFinite(phase) && phase > 0) {
+      state.round = phase;
+    }
+  }
+  const nextId = tally.currentPlayerId ?? tally.nextPlayerId ?? tally.loserId;
+  if (nextId) {
+    state.currentPlayerId = nextId;
+  }
+
+  applyTallyArrangements(tally);
+
+  const localIsLoser = isLocalPlayer(state.loserId);
+  state.phase = localIsLoser ? "challenge1-select" : "challenge1-wait";
+
+  const loser = playerById(state.loserId) ?? state.players.find((player) => playerMatches(player, state.loserId));
+  const loserLabel = loser?.name ?? state.loserId ?? "unknown";
+  setRankingNote(`${loserLabel} ranked last.`);
+  if (localIsLoser) {
+    setStatus("Challenge 1 · Rearrange your dice, then submit.");
+  } else {
+    setStatus(`Challenge 1 · Waiting for ${loserLabel} to rearrange dice.`);
+  }
+  renderPlayers();
+  renderOpponentBoards();
+  renderBoard();
+}
+
+async function confirmOpeningTally() {
+  if (!state.awaitingOpeningTallyAck) {
+    return;
+  }
+
+  setOpeningTallyOkBusy(true);
+  try {
+    await openingTally({ gameId: state.gameId, response: 1 });
+    if (
+      state.phase === "challenge1-wait" ||
+      state.phase === "challenge1-select" ||
+      state.phase === "arrange"
+    ) {
+      return;
+    }
+    state.awaitingOpeningTallyAck = false;
+    state.phase = "waiting";
+    setStatus("Opening tally confirmed. Waiting for the next turn…");
+    renderBoard();
+  } catch (error) {
+    setOpeningTallyOkBusy(false);
+    if (!isSessionExpiredError(error)) {
+      setStatus(error.message || "Could not confirm opening tally.");
+    }
+  }
+}
+
 export function applyOpeningRolled(payload) {
+  setGamePhase("openingRoll");
   const rolls = normalizeOpeningRolled(payload);
   if (!rolls.length) {
     return;
   }
+
+  state.awaitingOpeningTallyAck = false;
 
   const selfId = localPlayerId();
   rolls.forEach((roll) => {
@@ -473,7 +873,7 @@ export function applyOpeningRolled(payload) {
       } else if (phaseOk || state.phase === "arrange") {
         state.phase = "arrange";
         setStatus(
-          `Round ${state.round} · Your turn · ${roll.handName || "opening roll"}. Drag a pair to row 3 (second pair to row 4), then submit.`
+          `Round ${state.round} · Your turn · ${roll.handName || "opening roll"}. Drag a pair to row1 (second pair to row2), then submit.`
         );
         startArrangeTimer();
       }
@@ -484,10 +884,23 @@ export function applyOpeningRolled(payload) {
   renderBoard();
 }
 
+function applyNamedGamePhase(eventName) {
+  return () => {
+    setGamePhase(eventName);
+  };
+}
+
 async function listenForGameNotifications() {
   try {
     await subscribeGameNotifications({
       onOpeningRolled: applyOpeningRolled,
+      onOpeningTally: applyOpeningTally,
+      onChallenge1Select: applyChallenge1Select,
+      onChallenge1Reroll1: applyNamedGamePhase("challenge1Reroll1"),
+      onChallenge1RSelect2: applyNamedGamePhase("challenge1RSelect2"),
+      onChallenge1Reroll2: applyNamedGamePhase("challenge1Reroll2"),
+      onChallengeResolve: applyNamedGamePhase("challengeResolve"),
+      onGameDetails: applyGameDetails,
     });
   } catch {
     // Engine status already covers connection errors.
@@ -501,8 +914,9 @@ export async function enterGame(started) {
       onSlotClick,
       onDragStart,
       onDrop,
-      onSubmit: submitCurrentBoard,
+      onSubmit: handleSubmit,
       onReroll: handleReroll,
+      onOpeningTallyOk: confirmOpeningTally,
       onNewGame: newGame,
     });
     gameReady = true;
@@ -525,10 +939,7 @@ export async function enterGame(started) {
 
   applyStartedGame({ ...started, gameId });
   try {
-    const joined = await joinGame(gameId);
-    // #region agent log
-    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'post-fix',hypothesisId:'A',location:'gameController.js:enterGame',message:'joinGame return vs state.players',data:{joinedType:typeof joined,joinedKeys:joined&&typeof joined==='object'?Object.keys(joined):[],joinedPlayers:joined?.players??joined?.Players??joined,statePlayers:state.players,stateCount:state.players.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
+    await joinGame(gameId);
     setStatus("Game started. Waiting for opening roll…");
   } catch (error) {
     if (!isSessionExpiredError(error)) {

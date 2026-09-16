@@ -1,6 +1,7 @@
 import {
   canDrag,
   isHumanTurn,
+  isLocalPlayer,
   localPlayerId,
   otherPlayers,
   playerMatches,
@@ -17,8 +18,14 @@ const els = {
   row3: document.getElementById("row-3"),
   row4: document.getElementById("row-4"),
   opponentBoards: document.getElementById("opponent-boards"),
+  actionBar: document.getElementById("actionBar"),
   submitBtn: document.getElementById("submit-btn"),
   rollBtn: document.getElementById("roll-btn"),
+  openingTallyActions: document.getElementById("opening-tally-actions"),
+  openingTallyLoser: document.getElementById("opening-tally-loser"),
+  openingTallyOkBtn: document.getElementById("opening-tally-ok-btn"),
+  challengeWaitMessage: document.getElementById("challenge-wait-message"),
+  boardActionsControls: document.getElementById("board-actions-controls"),
   newGameBtn: document.getElementById("new-game-btn"),
   seatCount: document.getElementById("seat-count"),
   playerList: document.getElementById("player-list"),
@@ -26,6 +33,7 @@ const els = {
   rankingNote: document.getElementById("ranking-note"),
   timerLabel: document.getElementById("timer-label"),
   timerBar: document.getElementById("timer-bar"),
+  stakeLabel: document.getElementById("stake-label"),
   resultTitle: document.getElementById("result-title"),
   resultBody: document.getElementById("result-body"),
   resultNewGameBtn: document.getElementById("result-new-game-btn"),
@@ -142,6 +150,7 @@ export function bindGameView(nextHandlers) {
 
   els.submitBtn.addEventListener("click", () => handlers.onSubmit?.());
   els.rollBtn.addEventListener("click", () => handlers.onReroll?.());
+  els.openingTallyOkBtn?.addEventListener("click", () => handlers.onOpeningTallyOk?.());
   els.newGameBtn.addEventListener("click", () => handlers.onNewGame?.());
   els.resultNewGameBtn.addEventListener("click", () => handlers.onNewGame?.());
   els.seatCount.addEventListener("change", () => handlers.onNewGame?.());
@@ -179,6 +188,16 @@ export function setTimerDisplay(seconds, total) {
   els.timerBar.style.width = `${Math.max(0, (seconds / total) * 100)}%`;
 }
 
+export function setStakeDisplay(stake) {
+  if (stake == null || stake === "") {
+    els.stakeLabel.textContent = "—";
+    return;
+  }
+
+  const amount = Number(stake);
+  els.stakeLabel.textContent = Number.isFinite(amount) ? amount.toFixed(2) : String(stake);
+}
+
 export function setStatus(text) {
   els.turnStatus.textContent = text;
 }
@@ -196,9 +215,6 @@ export function getSeatCount() {
 }
 
 export function renderPlayers() {
-  // #region agent log
-  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'post-fix',hypothesisId:'E',location:'gameView.js:renderPlayers',message:'renderPlayers called',data:{playerListExists:Boolean(els.playerList),gameScreenHidden:document.getElementById('game-screen')?.hidden,playerCount:state.players.length,players:state.players,kinds:state.players.map((p)=>p.kind)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   els.playerList.innerHTML = "";
   state.players.forEach((player) => {
     const item = document.createElement("li");
@@ -220,27 +236,43 @@ export function renderPlayers() {
     item.append(name, badge);
     els.playerList.appendChild(item);
   });
-  // #region agent log
-  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'dfdec0'},body:JSON.stringify({sessionId:'dfdec0',runId:'post-fix',hypothesisId:'D',location:'gameView.js:renderPlayers:after',message:'player-list DOM after render',data:{childCount:els.playerList?.children?.length??null,innerText:els.playerList?.innerText??null,opponentCount:document.getElementById('opponent-boards')?.children?.length??null,opponentHidden:document.getElementById('opponent-boards')?.hidden},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   renderOpponentBoards();
 }
 
-function appendRowSlots(host, row, roll, compact) {
+function diceInRow(values, placements, row, packed) {
+  const items = [];
+  (values ?? []).forEach((value, index) => {
+    if (placements?.[index] === row) {
+      items.push({ index, value });
+    }
+  });
+  if (!packed) {
+    const aligned = Array.from({ length: 5 }, () => null);
+    items.forEach((item) => {
+      aligned[item.index] = item;
+    });
+    return aligned;
+  }
+  return Array.from({ length: 5 }, (_, slot) => items[slot] ?? null);
+}
+
+function appendRowSlots(host, row, roll, compact, packed = true) {
   host.innerHTML = "";
-  for (let index = 0; index < 5; index += 1) {
-    const slot = createSlot(row, index, { compact, interactive: false });
-    const occupied = roll && roll.placements[index] === row;
-    if (occupied) {
+  const items = roll
+    ? diceInRow(roll.values, roll.placements, row, packed)
+    : Array.from({ length: 5 }, () => null);
+  items.forEach((item, slotIndex) => {
+    const slot = createSlot(row, slotIndex, { compact, interactive: false });
+    if (item) {
       slot.appendChild(
-        createDie(index, roll.values[index], {
+        createDie(item.index, item.value, {
           compact,
           interactive: false,
         })
       );
     }
     host.appendChild(slot);
-  }
+  });
 }
 
 function openingRollFor(player) {
@@ -267,9 +299,9 @@ function createOpponentBoard(player) {
   card.appendChild(title);
 
   [
-    { row: 4, label: "Row 4 · Second pair" },
-    { row: 3, label: "Row 3 · Pair or better" },
-    { row: 2, label: "Row 2 · Rolled dice" },
+    { row: 4, label: "row2" },
+    { row: 3, label: "row1" },
+    { row: 2, label: "unarranged" },
   ].forEach(({ row, label }) => {
     const boardRow = document.createElement("div");
     boardRow.className = "board-row mb-2";
@@ -281,7 +313,7 @@ function createOpponentBoard(player) {
 
     const slots = document.createElement("div");
     slots.className = "dice-slots";
-    appendRowSlots(slots, row, roll, true);
+    appendRowSlots(slots, row, roll, true, true);
 
     boardRow.append(rowLabel, slots);
     card.appendChild(boardRow);
@@ -325,44 +357,96 @@ export function renderRanking() {
     .join("");
 }
 
+export function renderOpeningTallyActions() {
+  const tallying = Boolean(state.awaitingOpeningTallyAck);
+  const challengeWait = state.phase === "challenge1-wait";
+
+  if (els.openingTallyActions) {
+    els.openingTallyActions.hidden = !tallying;
+  }
+  if (els.challengeWaitMessage) {
+    els.challengeWaitMessage.hidden = !challengeWait;
+  }
+  if (els.boardActionsControls) {
+    els.boardActionsControls.hidden = tallying || challengeWait;
+  }
+  if (els.submitBtn) {
+    els.submitBtn.hidden = tallying || challengeWait;
+  }
+  if (!tallying) {
+    if (els.openingTallyLoser) {
+      els.openingTallyLoser.textContent = "—";
+    }
+    if (els.openingTallyOkBtn) {
+      els.openingTallyOkBtn.disabled = false;
+    }
+    return;
+  }
+
+  const loser = state.players.find((player) => playerMatches(player, state.loserId));
+  if (els.openingTallyLoser) {
+    els.openingTallyLoser.textContent = loser?.id ?? state.loserId ?? "—";
+  }
+}
+
+export function setOpeningTallyOkBusy(busy) {
+  if (els.openingTallyOkBtn) {
+    els.openingTallyOkBtn.disabled = Boolean(busy);
+  }
+}
+
 export function renderBoard() {
   const hosts = { 2: els.row2, 3: els.row3, 4: els.row4 };
   Object.values(hosts).forEach((row) => {
     row.innerHTML = "";
   });
 
-  const interactive = state.phase === "arrange" || state.phase === "select-reroll";
+  const interactive =
+    state.phase === "arrange" ||
+    state.phase === "select-reroll" ||
+    state.phase === "challenge1-select";
   const selfId = localPlayerId();
   const selfPlayer = state.players.find((player) => player.id === selfId) ?? { id: selfId };
   const opening = openingRollFor(selfPlayer);
-  const showDice = interactive || state.phase === "submitting" || Boolean(opening);
+  const showDice =
+    interactive ||
+    state.phase === "submitting" ||
+    state.phase === "opening-tally" ||
+    state.phase === "challenge1-wait" ||
+    Boolean(opening);
   const useLiveBoard =
     (interactive || state.phase === "submitting") && Array.isArray(state.values) && state.values.length === 5;
   const values = useLiveBoard ? state.values : opening?.values ?? state.values;
   const placements = useLiveBoard ? state.placements : opening?.placements ?? state.placements;
+  const packed = !useLiveBoard;
 
   for (let row = 2; row <= 4; row += 1) {
-    for (let index = 0; index < 5; index += 1) {
-      const slot = createSlot(row, index, { interactive });
-      const occupied = showDice && placements[index] === row;
-      if (occupied) {
+    const items = showDice
+      ? diceInRow(values, placements, row, packed)
+      : Array.from({ length: 5 }, () => null);
+    items.forEach((item, slotIndex) => {
+      const slot = createSlot(row, slotIndex, { interactive });
+      if (item) {
         slot.appendChild(
-          createDie(index, values[index], {
-            selected: interactive && state.selected.has(index),
-            reroll: state.phase === "select-reroll" && state.reroll[index],
+          createDie(item.index, item.value, {
+            selected: interactive && state.selected.has(item.index),
+            reroll: state.phase === "select-reroll" && state.reroll[item.index],
             draggable: canDrag(),
             interactive,
           })
         );
       }
       hosts[row].appendChild(slot);
-    }
+    });
   }
 
-  const humanArrange = state.phase === "arrange" && isHumanTurn();
-  els.submitBtn.disabled = !humanArrange;
+  const canSubmit =
+    (state.phase === "arrange" && isHumanTurn()) ||
+    (state.phase === "challenge1-select" && isLocalPlayer(state.loserId));
+  els.submitBtn.disabled = !canSubmit;
   els.rollBtn.hidden = state.phase !== "select-reroll";
   els.rollBtn.disabled = state.phase !== "select-reroll" || !state.reroll.some(Boolean);
+  renderOpeningTallyActions();
 }
 
 export function showResult(title, body) {
