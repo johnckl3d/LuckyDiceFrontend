@@ -1,4 +1,6 @@
 import {
+  isSessionExpiredError,
+  joinGame,
   pingEngine,
   rollDice,
   startGame,
@@ -14,6 +16,7 @@ import {
   defaultPlayers,
   isHumanTurn,
   normalizePlayer,
+  localPlayerId,
   playerById,
   playerMatches,
   resetBoard,
@@ -124,7 +127,12 @@ async function takeRoll(held) {
     held,
   });
 
-  state.values = result.values;
+  const faces = parseDiceValues(result?.values ?? result?.dice);
+  if (faces.length !== 5) {
+    return result;
+  }
+
+  state.values = faces;
   state.placements = [2, 2, 2, 2, 2];
   state.allowedDrops = result.allowedDrops;
   state.lastHandName = result.handName;
@@ -381,6 +389,17 @@ function pick(object, names) {
   return undefined;
 }
 
+function parseJsonPayload(payload) {
+  if (typeof payload !== "string") {
+    return payload;
+  }
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
+
 function parseDiceValues(raw) {
   if (Array.isArray(raw)) {
     return raw.map(Number).filter((value) => value >= 1 && value <= 6);
@@ -395,49 +414,27 @@ function parseDiceValues(raw) {
 }
 
 function normalizeOpeningRolled(payload) {
-  if (!payload) {
+  const data = parseJsonPayload(payload);
+  if (!data) {
     return [];
   }
-  const items = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload.results)
-      ? payload.results
-      : Array.isArray(payload.rolls)
-        ? payload.rolls
-        : Array.isArray(payload.players)
-          ? payload.players
-          : [payload];
+
+  const items = Array.isArray(data.rolls)
+    ? data.rolls
+    : Array.isArray(data.Rolls)
+      ? data.Rolls
+      : [];
 
   return items
     .map((item) => {
-      const playerId = pick(item, [
-        "playerId",
-        "PlayerId",
-        "id",
-        "Id",
-        "userId",
-        "UserId",
-      ]);
-      const nested = item.player ?? item.Player;
+      const fromDice = parseDiceValues(pick(item, ["dice", "Dice"]));
+      const values = fromDice.length ? fromDice : parseDiceValues(pick(item, ["values", "Values"]));
       return {
-        playerId: playerId ?? pick(nested, ["id", "playerId", "userId", "Id", "PlayerId"]),
-        values: parseDiceValues(
-          pick(item, [
-            "values",
-            "Values",
-            "dice",
-            "Dice",
-            "results",
-            "Results",
-            "openingRoll",
-            "OpeningRoll",
-            "openingResult",
-            "OpeningResult",
-            "diceValues",
-            "DiceValues",
-          ]) ?? item.roll?.values ?? item.Roll?.Values ?? item.result?.values ?? item.Result?.Values
-        ),
-        placements: pick(item, ["placements", "Placements"]),
+        playerId: pick(item, ["playerId", "PlayerId", "id", "Id", "userId", "UserId"]),
+        values,
+        allowedDrops: pick(item, ["allowedDrops", "AllowedDrops"]) ?? { row3: [], row4: [] },
+        handName: pick(item, ["handName", "HandName"]) ?? "",
+        instantWin: Boolean(pick(item, ["instantWin", "InstantWin"])),
       };
     })
     .filter((item) => item.playerId && item.values.length);
@@ -449,13 +446,38 @@ export function applyOpeningRolled(payload) {
     return;
   }
 
+  const selfId = localPlayerId();
   rolls.forEach((roll) => {
     const player = state.players.find((entry) => playerMatches(entry, roll.playerId));
     const playerId = player?.id ?? roll.playerId;
-    setOpeningRoll(playerId, roll.values, roll.placements);
+    setOpeningRoll(playerId, roll.values);
+    if (String(playerId) !== String(roll.playerId)) {
+      setOpeningRoll(roll.playerId, roll.values);
+    }
+
+    const isLocal =
+      (selfId && String(playerId) === String(selfId)) ||
+      (player && playerMatches(player, selfId));
+    const phaseOk = state.phase === "idle" || state.phase === "waiting";
+    if (isLocal) {
+      state.values = roll.values.slice(0, 5);
+      state.placements = roll.values.slice(0, 5).map(() => 2);
+      state.allowedDrops = roll.allowedDrops;
+      state.lastHandName = roll.handName;
+      if (roll.instantWin) {
+        handleInstantWin(roll);
+      } else if (phaseOk || state.phase === "arrange") {
+        state.phase = "arrange";
+        setStatus(
+          `Round ${state.round} · Your turn · ${roll.handName || "opening roll"}. Drag a pair to row 3 (second pair to row 4), then submit.`
+        );
+        startArrangeTimer();
+      }
+    }
   });
 
   renderOpponentBoards();
+  renderBoard();
 }
 
 async function listenForGameNotifications() {
@@ -468,7 +490,7 @@ async function listenForGameNotifications() {
   }
 }
 
-export function enterGame(started) {
+export async function enterGame(started) {
   if (!gameReady) {
     bindGameView({
       onDieClick,
@@ -485,16 +507,25 @@ export function enterGame(started) {
 
   showGameScreen(true);
   showEngineStatus();
-  listenForGameNotifications();
-  if (started?.gameId) {
-    applyStartedGame(started);
-    if (state.currentPlayerId) {
-      startTurn(state.currentPlayerId);
+  await listenForGameNotifications();
+
+  const gameId = started?.gameId ?? started?.GameId;
+  if (!gameId) {
+    if (started == null) {
+      newGame();
     } else {
-      setStatus("Game started. Waiting for your turn…");
+      setStatus("Could not join the table: missing gameId.");
     }
     return;
   }
 
-  newGame();
+  applyStartedGame({ ...started, gameId });
+  try {
+    await joinGame(gameId);
+    setStatus("Game started. Waiting for opening roll…");
+  } catch (error) {
+    if (!isSessionExpiredError(error)) {
+      setStatus(error.message || "Could not join the game.");
+    }
+  }
 }

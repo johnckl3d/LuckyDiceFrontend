@@ -1,4 +1,11 @@
-import { canDrag, isHumanTurn, otherPlayers, state } from "../models/gameModel.js";
+import {
+  canDrag,
+  isHumanTurn,
+  localPlayerId,
+  otherPlayers,
+  playerMatches,
+  state,
+} from "../models/gameModel.js";
 
 let resultModal = null;
 let handlers = {};
@@ -230,8 +237,19 @@ function appendRowSlots(host, row, roll, compact) {
   }
 }
 
+function openingRollFor(player) {
+  if (!player) {
+    return null;
+  }
+  if (state.openingRolls[player.id]) {
+    return state.openingRolls[player.id];
+  }
+  const match = Object.entries(state.openingRolls).find(([id]) => playerMatches(player, id));
+  return match ? match[1] : null;
+}
+
 function createOpponentBoard(player) {
-  const roll = state.openingRolls[player.id];
+  const roll = openingRollFor(player);
   const card = document.createElement("section");
   card.className = "table-felt rounded-4 p-3 opponent-board";
   card.dataset.playerId = player.id;
@@ -307,18 +325,27 @@ export function renderBoard() {
     row.innerHTML = "";
   });
 
-  const showDice = state.phase === "arrange" || state.phase === "select-reroll";
+  const interactive = state.phase === "arrange" || state.phase === "select-reroll";
+  const selfId = localPlayerId();
+  const selfPlayer = state.players.find((player) => player.id === selfId) ?? { id: selfId };
+  const opening = openingRollFor(selfPlayer);
+  const showDice = interactive || state.phase === "submitting" || Boolean(opening);
+  const useLiveBoard =
+    (interactive || state.phase === "submitting") && Array.isArray(state.values) && state.values.length === 5;
+  const values = useLiveBoard ? state.values : opening?.values ?? state.values;
+  const placements = useLiveBoard ? state.placements : opening?.placements ?? state.placements;
 
   for (let row = 2; row <= 4; row += 1) {
     for (let index = 0; index < 5; index += 1) {
-      const slot = createSlot(row, index);
-      const occupied = showDice && state.placements[index] === row;
+      const slot = createSlot(row, index, { interactive });
+      const occupied = showDice && placements[index] === row;
       if (occupied) {
         slot.appendChild(
-          createDie(index, state.values[index], {
-            selected: state.selected.has(index),
+          createDie(index, values[index], {
+            selected: interactive && state.selected.has(index),
             reroll: state.phase === "select-reroll" && state.reroll[index],
             draggable: canDrag(),
+            interactive,
           })
         );
       }

@@ -98,7 +98,7 @@ function handleLobbyUpdated() {
 const PLAYER_RESPONSE_START = 1;
 
 function handleGameReady(game) {
-  const gameId = game?.gameId ?? "";
+  const gameId = game?.gameId ?? game?.GameId ?? "";
   if (gameId && gameId === lastReadyGameId) {
     return;
   }
@@ -129,12 +129,46 @@ async function handleReadyStart() {
   }
 }
 
-function handleGameStarted(start) {
+function readGameId(value) {
+  if (value == null) {
+    return "";
+  }
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text) {
+      return "";
+    }
+    if (text.startsWith("{") || text.startsWith("[")) {
+      try {
+        return readGameId(JSON.parse(text));
+      } catch {
+        return text;
+      }
+    }
+    return text;
+  }
+  if (Array.isArray(value)) {
+    return readGameId(value[0]);
+  }
+  if (typeof value === "object") {
+    const id = value.gameId ?? value.GameId;
+    return id == null ? "" : String(id).trim();
+  }
+  return String(value).trim();
+}
+
+async function handleTableStarted(payload) {
+  const gameId = readGameId(payload) || lastReadyGameId;
   hideSeatsFilledPopup();
   lastReadyGameId = "";
   stopPolling();
   hideLobby();
-  enterGame(start);
+  if (!gameId) {
+    showLobby();
+    showLobbyError("Table started, but no gameId was provided.");
+    return;
+  }
+  await enterGame({ gameId });
 }
 
 async function handleReadyCancel() {
@@ -165,7 +199,7 @@ async function listenForLobbyNotifications() {
     await subscribeLobbyNotifications({
       onUpdated: handleLobbyUpdated,
       onReady: handleGameReady,
-      onStarted: handleGameStarted,
+      onStarted: handleTableStarted,
       onOpeningRolled: applyOpeningRolled,
     });
   } catch {

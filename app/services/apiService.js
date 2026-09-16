@@ -205,7 +205,9 @@ export async function pingEngine() {
 function bindLobbyNotificationHandlers(connection) {
   connection.off("lobbyUpdated");
   connection.off("tableReady");
-  connection.off("gameStarted");
+  connection.off("TableReady");
+  connection.off("tableStarted");
+  connection.off("TableStarted");
   connection.off("openingRolled");
   connection.off("OpeningRolled");
   if (lobbyNotificationHandlers?.onUpdated) {
@@ -213,9 +215,11 @@ function bindLobbyNotificationHandlers(connection) {
   }
   if (lobbyNotificationHandlers?.onReady) {
     connection.on("tableReady", lobbyNotificationHandlers.onReady);
+    connection.on("TableReady", lobbyNotificationHandlers.onReady);
   }
   if (lobbyNotificationHandlers?.onStarted) {
-    connection.on("gameStarted", lobbyNotificationHandlers.onStarted);
+    connection.on("tableStarted", lobbyNotificationHandlers.onStarted);
+    connection.on("TableStarted", lobbyNotificationHandlers.onStarted);
   }
   if (lobbyNotificationHandlers?.onOpeningRolled) {
     connection.on("openingRolled", lobbyNotificationHandlers.onOpeningRolled);
@@ -258,6 +262,10 @@ export async function sendPlayerResponse(gameId, response) {
 
 export async function leaveLobbyGame(gameId) {
   return invoke("lobby", "/hubs/lobby", "LeaveGame", [gameId], true);
+}
+
+export async function joinGame(gameId) {
+  return invoke("game", "/hubs/game", "join", [{ gameId }], true);
 }
 
 export async function startGame(players) {
