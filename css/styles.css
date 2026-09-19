@@ -92,6 +92,28 @@ body {
   display: none !important;
 }
 
+#rerollActionBar:not([hidden]),
+#acknowledgementActionBar:not([hidden]),
+#waitingActionBar:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+#rerollActionBar[hidden],
+#acknowledgementActionBar[hidden],
+#waitingActionBar[hidden],
+#actionBar[hidden] {
+  display: none !important;
+}
+
+.reroll-slots {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+}
+
 .timer-digits {
   font-size: 1.75rem;
   line-height: 1;

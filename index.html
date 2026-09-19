@@ -195,7 +195,7 @@
             </div>
 
             <div class="board-row board-row-actions" data-row="1">
-              <div class="board-row-label">actionBar</div>
+              <div class="board-row-label" id="action-bar-label">actionBar</div>
               <div id="actionBar" class="action-bar" aria-label="actionBar">
                 <div id="challenge-wait-message" class="challenge-wait-message" hidden>
                   Waiting for other players to roll dice...
@@ -231,6 +231,26 @@
                       <div class="progress-bar bg-warning" id="timer-bar" style="width: 0%"></div>
                     </div>
                   </div>
+                </div>
+              </div>
+              <div id="rerollActionBar" class="action-bar reroll-action-bar" aria-label="rerollActionBar" hidden>
+                <div id="reroll-slots" class="dice-slots reroll-slots" data-row="1" aria-label="reroll slots"></div>
+                <button type="button" class="btn btn-light btn-lg px-4" id="reroll-submit-btn" disabled>
+                  Submit
+                </button>
+              </div>
+              <div id="acknowledgementActionBar" class="action-bar acknowledgement-action-bar" aria-label="acknowledgementActionBar" hidden>
+                <div class="text-white">
+                  <span class="small text-white-50">Loser :</span>
+                  <span class="font-monospace ms-2" id="acknowledgement-loser">—</span>
+                </div>
+                <button type="button" class="btn btn-warning btn-lg px-4" id="acknowledgement-ok-btn">
+                  Ok
+                </button>
+              </div>
+              <div id="waitingActionBar" class="action-bar waiting-action-bar" aria-label="waitingBar" hidden>
+                <div class="text-white waiting-bar-message" id="waiting-bar-message">
+                  waiting for — to reroll
                 </div>
               </div>
             </div>

@@ -232,8 +232,8 @@ function bindGameNotificationHandlers(connection) {
   connection.off("OpeningRolled");
   connection.off("openingTally");
   connection.off("OpeningTally");
-  connection.off("challenge1Select");
-  connection.off("Challenge1Select");
+  connection.off("onTurnAssigned");
+  connection.off("OnTurnAssigned");
   connection.off("challenge1Reroll1");
   connection.off("Challenge1Reroll1");
   connection.off("challenge1RSelect2");
@@ -252,9 +252,9 @@ function bindGameNotificationHandlers(connection) {
     connection.on("openingTally", gameNotificationHandlers.onOpeningTally);
     connection.on("OpeningTally", gameNotificationHandlers.onOpeningTally);
   }
-  if (gameNotificationHandlers?.onChallenge1Select) {
-    connection.on("challenge1Select", gameNotificationHandlers.onChallenge1Select);
-    connection.on("Challenge1Select", gameNotificationHandlers.onChallenge1Select);
+  if (gameNotificationHandlers?.onTurnAssigned) {
+    connection.on("onTurnAssigned", gameNotificationHandlers.onTurnAssigned);
+    connection.on("OnTurnAssigned", gameNotificationHandlers.onTurnAssigned);
   }
   if (gameNotificationHandlers?.onChallenge1Reroll1) {
     connection.on("challenge1Reroll1", gameNotificationHandlers.onChallenge1Reroll1);
@@ -327,11 +327,18 @@ export async function arrangeOpening(payload) {
 }
 
 export async function openingTally(payload) {
-  return invoke("game", "/hubs/game", "openingTally", [payload], true);
+  return invoke(
+    "game",
+    "/hubs/game",
+    "openingTally",
+    [{ gameId: payload?.gameId, request: payload?.request ?? "1" }],
+    true
+  );
 }
 
 export async function sendChallenge1Reroll1(payload) {
-  return invoke("game", "/hubs/game", "challenge1Reroll1", [payload], true);
+  const dice = Array.isArray(payload?.dice) ? payload.dice.map(String) : [];
+  return invoke("game", "/hubs/game", "challenge1Reroll1", [{ gameId: payload?.gameId, dice }], true);
 }
 
 export async function tallyHands(payload) {

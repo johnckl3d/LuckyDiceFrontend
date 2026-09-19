@@ -23,7 +23,9 @@ import {
   localPlayerId,
   playerById,
   playerMatches,
+  rerollDiceFaces,
   resetBoard,
+  resetRerollSlots,
   revertInvalidPlacements,
   setOpeningArrangement,
   setOpeningRoll,
@@ -58,6 +60,7 @@ let gamePhase = null;
 
 function setGamePhase(eventName) {
   gamePhase = eventName;
+  state.gamePhase = eventName;
 }
 
 function clearTimer() {
@@ -102,11 +105,11 @@ function onDieClick(index) {
   renderBoard();
 }
 
-function onSlotClick(row) {
+function onSlotClick(row, slotIndex) {
   if (!canDrag() || state.selected.size === 0) {
     return;
   }
-  placeDice([...state.selected], row);
+  placeDice([...state.selected], row, slotIndex);
 }
 
 function onDragStart(index) {
@@ -116,16 +119,16 @@ function onDragStart(index) {
   }
 }
 
-function onDrop(index, row) {
+function onDrop(index, row, slotIndex) {
   const moving = state.selected.size ? [...state.selected] : [index];
   if (!moving.includes(index)) {
     moving.push(index);
   }
-  placeDice(moving, row);
+  placeDice(moving, row, slotIndex);
 }
 
-function placeDice(indices, row) {
-  const result = tryPlace(indices, row);
+function placeDice(indices, row, slotIndex) {
+  const result = tryPlace(indices, row, slotIndex);
   if (result.invalidDrop) {
     setStatus("That drop is not allowed for this hand.");
   }
@@ -226,18 +229,15 @@ function restoreArrangeAfterReject(message) {
 }
 
 async function handleSubmit() {
-  if (state.phase === "challenge1-select") {
-    await submitChallenge1Select();
-    return;
-  }
   await submitOpeningArrange();
 }
 
-async function submitChallenge1Select() {
+async function submitChallenge1Reroll() {
   if (state.phase !== "challenge1-select" || !isLocalPlayer(state.loserId)) {
     return;
   }
 
+  const dice = rerollDiceFaces();
   clearTimer();
   state.phase = "submitting";
   setTimerDisplay(0, turnDuration());
@@ -245,7 +245,7 @@ async function submitChallenge1Select() {
 
   let response;
   try {
-    response = await sendChallenge1Reroll1(openingArrangePayload("challenge1Reroll1"));
+    response = await sendChallenge1Reroll1({ gameId: state.gameId, dice });
   } catch (error) {
     if (isSessionExpiredError(error)) {
       return;
@@ -263,13 +263,11 @@ async function submitChallenge1Select() {
     return;
   }
 
-  const selfId = localPlayerId();
-  if (selfId) {
-    setOpeningArrangement(selfId, openingArrangePayload("challenge1Reroll1"));
-  }
   state.selected.clear();
+  state.showRerollBar = false;
+  resetRerollSlots();
   state.phase = "waiting";
-  setStatus("Arrangement submitted. Waiting for other players…");
+  setStatus("Reroll submitted. Waiting for other players…");
   renderBoard();
 }
 
@@ -467,6 +465,7 @@ async function newGame() {
   state.ranking = [];
   state.round = 1;
   state.phase = "idle";
+  setGamePhase(null);
   state.selected.clear();
   state.openingRolls = {};
   state.loserId = null;
@@ -508,6 +507,7 @@ export function leaveGame() {
   clearTimer();
   hideResult();
   state.awaitingOpeningTallyAck = false;
+  setGamePhase(null);
   state.loserId = null;
   renderBoard();
   showGameScreen(false);
@@ -524,6 +524,7 @@ function applyStartedGame(started) {
   state.ranking = [];
   state.round = started.round ?? 1;
   state.phase = "idle";
+  setGamePhase(null);
   state.selected.clear();
   state.openingRolls = {};
   state.loserId = null;
@@ -674,7 +675,9 @@ function normalizeOpeningTally(payload) {
     currentPlayerId:
       pick(data, ["currentPlayerId", "CurrentPlayerId"]) ??
       pick(tally, ["currentPlayerId", "CurrentPlayerId"]),
-    loserId: pick(data, ["loserId", "LoserId"]) ?? pick(tally, ["loserId", "LoserId"]),
+    loserId:
+      pick(data, ["loserId", "LoserId", "loser", "Loser"]) ??
+      pick(tally, ["loserId", "LoserId", "loser", "Loser"]),
     ranking: Array.isArray(tally.ranking) ? tally.ranking : Array.isArray(data.ranking) ? data.ranking : [],
     nextPlayerId: pick(tally, ["nextPlayerId", "NextPlayerId"]) ?? pick(data, ["nextPlayerId", "NextPlayerId"]),
     players,
@@ -734,6 +737,9 @@ export function applyOpeningTally(payload) {
   setTimerDisplay(null, turnDuration());
   state.selected.clear();
   state.phase = "opening-tally";
+  state.showRerollBar = false;
+  state.showAckBar = true;
+  resetRerollSlots();
   state.awaitingOpeningTallyAck = true;
   state.loserId = tally.loserId ?? null;
   if (tally.ranking.length) {
@@ -762,8 +768,11 @@ export function applyOpeningTally(payload) {
 }
 
 export function applyChallenge1Select(payload) {
-  setGamePhase("challenge1Select");
+  setGamePhase("onTurnAssigned");
   const tally = normalizeOpeningTally(payload);
+  // #region agent log
+  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d419e7'},body:JSON.stringify({sessionId:'d419e7',runId:'pre-fix',hypothesisId:'F',location:'gameController.js:applyChallenge1Select',message:'challenge1Select notification',data:{ok:Boolean(tally),phase:tally?.phase,loserId:tally?.loserId,gameId:tally?.gameId,stateGameId:state.gameId,localId:localPlayerId()},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!tally) {
     return;
   }
@@ -799,15 +808,18 @@ export function applyChallenge1Select(payload) {
   applyTallyArrangements(tally);
 
   const localIsLoser = isLocalPlayer(state.loserId);
+  resetRerollSlots();
+  state.showRerollBar = localIsLoser;
+  state.showAckBar = false;
   state.phase = localIsLoser ? "challenge1-select" : "challenge1-wait";
 
   const loser = playerById(state.loserId) ?? state.players.find((player) => playerMatches(player, state.loserId));
   const loserLabel = loser?.name ?? state.loserId ?? "unknown";
   setRankingNote(`${loserLabel} ranked last.`);
   if (localIsLoser) {
-    setStatus("Challenge 1 · Rearrange your dice, then submit.");
+    setStatus("Challenge 1 · Place dice to reroll, then submit.");
   } else {
-    setStatus(`Challenge 1 · Waiting for ${loserLabel} to rearrange dice.`);
+    setStatus(`waiting for ${state.loserId ?? loserLabel} to reroll`);
   }
   renderPlayers();
   renderOpponentBoards();
@@ -815,22 +827,20 @@ export function applyChallenge1Select(payload) {
 }
 
 async function confirmOpeningTally() {
-  if (!state.awaitingOpeningTallyAck) {
+  if (gamePhase !== "openingTally") {
     return;
   }
 
   setOpeningTallyOkBusy(true);
   try {
-    await openingTally({ gameId: state.gameId, response: 1 });
-    if (
-      state.phase === "challenge1-wait" ||
-      state.phase === "challenge1-select" ||
-      state.phase === "arrange"
-    ) {
+    await openingTally({ gameId: state.gameId, request: "1" });
+    if (gamePhase !== "openingTally") {
       return;
     }
     state.awaitingOpeningTallyAck = false;
+    state.showAckBar = false;
     state.phase = "waiting";
+    setGamePhase("waiting");
     setStatus("Opening tally confirmed. Waiting for the next turn…");
     renderBoard();
   } catch (error) {
@@ -895,7 +905,7 @@ async function listenForGameNotifications() {
     await subscribeGameNotifications({
       onOpeningRolled: applyOpeningRolled,
       onOpeningTally: applyOpeningTally,
-      onChallenge1Select: applyChallenge1Select,
+      onTurnAssigned: applyChallenge1Select,
       onChallenge1Reroll1: applyNamedGamePhase("challenge1Reroll1"),
       onChallenge1RSelect2: applyNamedGamePhase("challenge1RSelect2"),
       onChallenge1Reroll2: applyNamedGamePhase("challenge1Reroll2"),
@@ -915,8 +925,10 @@ export async function enterGame(started) {
       onDragStart,
       onDrop,
       onSubmit: handleSubmit,
+      onRerollSubmit: submitChallenge1Reroll,
       onReroll: handleReroll,
       onOpeningTallyOk: confirmOpeningTally,
+      onAcknowledgementOk: confirmOpeningTally,
       onNewGame: newGame,
     });
     gameReady = true;

@@ -11,6 +11,7 @@ export const state = {
   selected: new Set(),
   reroll: [false, false, false, false, false],
   phase: "idle",
+  gamePhase: null,
   secondsLeft: 0,
   turnTime: 0,
   stake: null,
@@ -19,6 +20,9 @@ export const state = {
   openingRolls: {},
   loserId: null,
   awaitingOpeningTallyAck: false,
+  showRerollBar: false,
+  showAckBar: false,
+  rerollSlots: [null, null, null, null, null],
 };
 
 export function normalizePlayer(player) {
@@ -136,13 +140,76 @@ export function canDrag() {
   return state.phase === "arrange" && isHumanTurn();
 }
 
+export function resetRerollSlots() {
+  state.rerollSlots = [null, null, null, null, null];
+}
+
 export function resetBoard(values = [1, 1, 1, 1, 1]) {
   state.values = values.slice();
   state.placements = [2, 2, 2, 2, 2];
   state.allowedDrops = { row3: [], row4: [] };
   state.selected.clear();
   state.reroll = [false, false, false, false, false];
+  state.showRerollBar = false;
+  state.showAckBar = false;
+  resetRerollSlots();
   state.lastHandName = null;
+}
+
+export function rerollDiceFaces() {
+  return state.rerollSlots
+    .filter((index) => index != null)
+    .map((index) => String(state.values[index]));
+}
+
+function clearRerollSlotForDie(index) {
+  const slot = state.rerollSlots.indexOf(index);
+  if (slot >= 0) {
+    state.rerollSlots[slot] = null;
+  }
+}
+
+function nextEmptyRerollSlot(from = 0) {
+  for (let slot = from; slot < 5; slot += 1) {
+    if (state.rerollSlots[slot] == null) {
+      return slot;
+    }
+  }
+  return state.rerollSlots.findIndex((value) => value == null);
+}
+
+function placeOnRerollSlots(indices, slotIndex) {
+  let changed = false;
+  const start = Number.isInteger(slotIndex) && slotIndex >= 0 && slotIndex < 5 ? slotIndex : 0;
+
+  indices.forEach((index, offset) => {
+    if (index < 0 || index >= state.values.length) {
+      return;
+    }
+
+    const target =
+      offset === 0 && Number.isInteger(slotIndex) && slotIndex >= 0 && slotIndex < 5
+        ? slotIndex
+        : nextEmptyRerollSlot(start);
+
+    if (target < 0) {
+      return;
+    }
+
+    const occupant = state.rerollSlots[target];
+    if (occupant != null && occupant !== index) {
+      state.placements[occupant] = 2;
+      state.rerollSlots[target] = null;
+    }
+
+    clearRerollSlotForDie(index);
+    state.rerollSlots[target] = index;
+    state.placements[index] = 1;
+    changed = true;
+  });
+
+  state.selected.clear();
+  return { changed, invalidDrop: !changed };
 }
 
 export function applyAllowedPlacements() {
@@ -174,11 +241,16 @@ export function toggleReroll(index) {
   state.reroll[index] = !state.reroll[index];
 }
 
-export function tryPlace(indices, row) {
+export function tryPlace(indices, row, slotIndex) {
   if (state.phase === "challenge1-select") {
+    if (row === 1) {
+      return placeOnRerollSlots(indices, slotIndex);
+    }
+
     let changed = false;
     indices.forEach((index) => {
       if (row === 2 || row === 3 || row === 4) {
+        clearRerollSlotForDie(index);
         state.placements[index] = row;
         changed = true;
       }
