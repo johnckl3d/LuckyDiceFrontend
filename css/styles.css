@@ -117,6 +117,17 @@ body {
   gap: 1rem;
 }
 
+.acknowledgement-labels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1.5rem;
+}
+
+.acknowledgement-ok-btn {
+  margin-left: auto;
+}
+
 #rerollActionBar[hidden],
 #acknowledgementActionBar[hidden],
 #waitingActionBar[hidden],

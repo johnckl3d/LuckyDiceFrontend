@@ -176,12 +176,6 @@ async function ensureConnection(key, path, withAccessToken = false) {
 async function invoke(key, path, method, args = [], withAccessToken = false) {
   const connection = await ensureConnection(key, path, withAccessToken);
   try {
-    // #region agent log
-    if (/arrange|reroll|Reroll/i.test(String(method))) {
-      const first = args?.[0];
-      fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'A',location:'apiService.js:invoke',message:'hub invoke',data:{method,payloadTarget:first?.target ?? null,keys:first && typeof first === 'object' ? Object.keys(first) : []},timestamp:Date.now()})}).catch(()=>{});
-    }
-    // #endregion
     return await connection.invoke(method, ...args);
   } catch (error) {
     throw hubError(error);
@@ -254,6 +248,10 @@ function bindGameNotificationHandlers(connection) {
   connection.off("Challenge1Reroll2");
   connection.off("challengeResolve");
   connection.off("ChallengeResolve");
+  connection.off("onRoundTally");
+  connection.off("OnRoundTally");
+  connection.off("onGameOver");
+  connection.off("OnGameOver");
   connection.off("gameDetails");
   connection.off("GameDetails");
   if (gameNotificationHandlers?.onOpeningRolled) {
@@ -289,6 +287,14 @@ function bindGameNotificationHandlers(connection) {
   if (gameNotificationHandlers?.onChallengeResolve) {
     connection.on("challengeResolve", gameNotificationHandlers.onChallengeResolve);
     connection.on("ChallengeResolve", gameNotificationHandlers.onChallengeResolve);
+  }
+  if (gameNotificationHandlers?.onRoundTally) {
+    connection.on("onRoundTally", gameNotificationHandlers.onRoundTally);
+    connection.on("OnRoundTally", gameNotificationHandlers.onRoundTally);
+  }
+  if (gameNotificationHandlers?.onGameOver) {
+    connection.on("onGameOver", gameNotificationHandlers.onGameOver);
+    connection.on("OnGameOver", gameNotificationHandlers.onGameOver);
   }
   if (gameNotificationHandlers?.onGameDetails) {
     connection.on("gameDetails", gameNotificationHandlers.onGameDetails);
@@ -381,6 +387,36 @@ export async function openingTally(payload) {
         gameId: payload?.gameId,
         request: payload?.request ?? "1",
         ...boardDicePayload(payload),
+      },
+    ],
+    true
+  );
+}
+
+export async function onRoundTally(payload) {
+  return invoke(
+    "game",
+    "/hubs/game",
+    "onRoundTally",
+    [
+      {
+        gameId: payload?.gameId,
+        request: payload?.request ?? "1",
+      },
+    ],
+    true
+  );
+}
+
+export async function onGameOver(payload) {
+  return invoke(
+    "game",
+    "/hubs/game",
+    "onGameOver",
+    [
+      {
+        gameId: payload?.gameId,
+        request: payload?.request ?? "1",
       },
     ],
     true

@@ -24,6 +24,7 @@ const els = {
   rerollActionBar: document.getElementById("rerollActionBar"),
   acknowledgementActionBar: document.getElementById("acknowledgementActionBar"),
   acknowledgementLoser: document.getElementById("acknowledgement-loser"),
+  acknowledgementWinner: document.getElementById("acknowledgement-winner"),
   acknowledgementOkBtn: document.getElementById("acknowledgement-ok-btn"),
   waitingActionBar: document.getElementById("waitingActionBar"),
   waitingBarMessage: document.getElementById("waiting-bar-message"),
@@ -380,8 +381,16 @@ function isRerollBarVisible() {
   return Boolean(state.showRerollBar) || state.phase === "challenge1-select";
 }
 
+function isAckPhase() {
+  return (
+    state.gamePhase === "openingTally" ||
+    state.gamePhase === "onRoundTally" ||
+    state.gamePhase === "onGameOver"
+  );
+}
+
 function isAckBarVisible() {
-  return Boolean(state.showAckBar) || state.gamePhase === "openingTally";
+  return Boolean(state.showAckBar) || isAckPhase();
 }
 
 function isReroll1Phase() {
@@ -406,7 +415,7 @@ export function renderOpeningTallyActions() {
   const challengeWait = state.phase === "challenge1-wait";
   const rerollBar = isRerollBarVisible();
   const ackBar = isAckBarVisible();
-  const waitingBar = isWaitingBarVisible();
+  const waitingBar = isWaitingBarVisible() && !ackBar && !rerollBar;
   const swapped = rerollBar || ackBar || waitingBar;
 
   if (els.actionBar) {
@@ -445,8 +454,12 @@ export function renderOpeningTallyActions() {
   }
 
   const loserId = state.loserId ?? "—";
+  const winnerId = state.winnerId ?? "—";
   if (els.acknowledgementLoser) {
     els.acknowledgementLoser.textContent = ackBar ? loserId : "—";
+  }
+  if (els.acknowledgementWinner) {
+    els.acknowledgementWinner.textContent = ackBar ? winnerId : "—";
   }
   if (els.waitingBarMessage) {
     els.waitingBarMessage.textContent = waitingBar
@@ -454,7 +467,7 @@ export function renderOpeningTallyActions() {
       : "waiting for — to reroll";
   }
   if (els.acknowledgementOkBtn) {
-    els.acknowledgementOkBtn.disabled = state.gamePhase !== "openingTally";
+    els.acknowledgementOkBtn.disabled = !isAckPhase();
   }
 
   if (!tallying) {
@@ -499,6 +512,8 @@ export function renderBoard() {
     interactive ||
     state.phase === "submitting" ||
     state.phase === "opening-tally" ||
+    state.phase === "on-round-tally" ||
+    state.phase === "game-over" ||
     state.phase === "challenge1-wait" ||
     state.phase === "reroll1" ||
     Boolean(opening);

@@ -3,6 +3,8 @@ import {
   isSessionExpiredError,
   joinGame,
   openingTally,
+  onGameOver,
+  onRoundTally,
   pingEngine,
   rollDice,
   reroll1,
@@ -255,9 +257,6 @@ function restoreArrangeAfterReject(message) {
 }
 
 async function handleSubmit() {
-  // #region agent log
-  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'B',location:'gameController.js:handleSubmit',message:'submit branch',data:{phase:state.phase,gamePhase:state.gamePhase,isReroll1Arrange:isReroll1Arrange()},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (isReroll1Arrange()) {
     await submitReroll1Arrange();
     return;
@@ -267,9 +266,6 @@ async function handleSubmit() {
 
 async function submitReroll1Arrange() {
   if (!isReroll1Arrange() || !isLocalPlayer(state.loserId)) {
-    // #region agent log
-    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'B',location:'gameController.js:submitReroll1Arrange',message:'submit skipped',data:{phase:state.phase,gamePhase:state.gamePhase,isReroll1Arrange:isReroll1Arrange()},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return;
   }
 
@@ -281,9 +277,6 @@ async function submitReroll1Arrange() {
   let response;
   try {
     const payload = boardDicePayload();
-    // #region agent log
-    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'C',location:'gameController.js:submitReroll1Arrange',message:'calling reroll1Arrange',data:{gamePhase:state.gamePhase,phase:state.phase},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     response = await reroll1Arrange(payload);
   } catch (error) {
     if (isSessionExpiredError(error)) {
@@ -372,9 +365,6 @@ async function submitOpeningArrange() {
   let response;
   try {
     const payload = openingArrangePayload("openingArrange");
-    // #region agent log
-    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'E',location:'gameController.js:submitOpeningArrange',message:'calling openingArrange',data:{payloadTarget:payload.target,gamePhase:state.gamePhase,phase:state.phase},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     response = await arrangeOpening(payload);
   } catch (error) {
     if (isSessionExpiredError(error)) {
@@ -560,6 +550,7 @@ async function newGame() {
   state.selected.clear();
   state.openingRolls = {};
   state.loserId = null;
+  state.winnerId = null;
   state.awaitingOpeningTallyAck = false;
   state.turnTime = 0;
   state.stake = null;
@@ -600,6 +591,7 @@ export function leaveGame() {
   state.awaitingOpeningTallyAck = false;
   setGamePhase(null);
   state.loserId = null;
+  state.winnerId = null;
   renderBoard();
   showGameScreen(false);
 }
@@ -619,6 +611,7 @@ function applyStartedGame(started) {
   state.selected.clear();
   state.openingRolls = {};
   state.loserId = null;
+  state.winnerId = null;
   state.awaitingOpeningTallyAck = false;
   state.turnTime = preservedTurnTime;
   state.stake = preservedStake;
@@ -773,10 +766,90 @@ function normalizeOpeningTally(payload) {
     loserId:
       pick(data, ["loserId", "LoserId", "loser", "Loser"]) ??
       pick(tally, ["loserId", "LoserId", "loser", "Loser"]),
+    winnerId:
+      pick(data, ["winnerId", "WinnerId", "winner", "Winner"]) ??
+      pick(tally, ["winnerId", "WinnerId", "winner", "Winner"]),
+    gameOver: pick(data, ["gameOver", "GameOver"]) ?? pick(tally, ["gameOver", "GameOver"]),
     ranking: Array.isArray(tally.ranking) ? tally.ranking : Array.isArray(data.ranking) ? data.ranking : [],
     nextPlayerId: pick(tally, ["nextPlayerId", "NextPlayerId"]) ?? pick(data, ["nextPlayerId", "NextPlayerId"]),
     players,
   };
+}
+
+function normalizeDiceRows(raw) {
+  if (Array.isArray(raw)) {
+    return { set1: [], set2: [], flux: [], values: raw };
+  }
+  if (!raw || typeof raw !== "object") {
+    return { set1: [], set2: [], flux: [], values: null };
+  }
+  const nested = pick(raw, ["dices", "Dices", "dice", "Dice"]);
+  const source = nested && typeof nested === "object" && !Array.isArray(nested) ? nested : raw;
+  return {
+    set1: normalizeRowFaces(pick(source, ["set1", "Set1", "row1", "Row1"])),
+    set2: normalizeRowFaces(pick(source, ["set2", "Set2", "row2", "Row2"])),
+    flux: normalizeRowFaces(
+      pick(source, ["flux", "Flux", "unarranged", "Unarranged", "discarded", "Discarded"])
+    ),
+    values: pick(source, ["values", "Values"]),
+  };
+}
+
+function normalizePlayersFromDices(dices) {
+  if (!dices) {
+    return [];
+  }
+  if (Array.isArray(dices)) {
+    return dices
+      .map((item) => {
+        const playerId = pick(item, ["playerId", "PlayerId", "id", "Id", "userId", "UserId"]);
+        if (!playerId) {
+          return null;
+        }
+        return { playerId, ...normalizeDiceRows(item) };
+      })
+      .filter(Boolean);
+  }
+  if (typeof dices !== "object") {
+    return [];
+  }
+  return Object.entries(dices)
+    .map(([playerId, rows]) => {
+      if (!playerId || /^(set1|set2|flux|row1|row2|unarranged|discarded|values)$/i.test(playerId)) {
+        return null;
+      }
+      return { playerId, ...normalizeDiceRows(rows) };
+    })
+    .filter(Boolean);
+}
+
+function normalizeRoundTally(payload) {
+  const tally = normalizeOpeningTally(payload);
+  if (!tally) {
+    return null;
+  }
+
+  const data = parseJsonPayload(payload);
+  const dices = pick(data, ["dices", "Dices", "dice", "Dice"]);
+  const fromDices = normalizePlayersFromDices(dices);
+  if (fromDices.length) {
+    tally.players = fromDices;
+    return tally;
+  }
+
+  const sourcePlayers = Array.isArray(data?.players) ? data.players : [];
+  if (sourcePlayers.length) {
+    tally.players = sourcePlayers
+      .map((item) => {
+        const playerId = pick(item, ["playerId", "PlayerId", "id", "Id", "userId", "UserId"]);
+        if (!playerId) {
+          return null;
+        }
+        return { playerId, ...normalizeDiceRows(item) };
+      })
+      .filter(Boolean);
+  }
+  return tally;
 }
 
 function applyTallyArrangements(tally) {
@@ -837,6 +910,7 @@ export function applyOpeningTally(payload) {
   resetRerollSlots();
   state.awaitingOpeningTallyAck = true;
   state.loserId = tally.loserId ?? null;
+  state.winnerId = tally.winnerId ?? null;
   if (tally.ranking.length) {
     state.ranking = tally.ranking;
     renderRanking();
@@ -857,6 +931,106 @@ export function applyOpeningTally(payload) {
   const loserLabel = loser?.name ?? state.loserId ?? "unknown";
   setRankingNote(`${loserLabel} ranked last.`);
   setStatus(`Opening tally complete. Loser: ${state.loserId ?? loserLabel}. Confirm to continue.`);
+  renderPlayers();
+  renderOpponentBoards();
+  renderBoard();
+}
+
+export function applyRoundTally(payload) {
+  setGamePhase("onRoundTally");
+  const tally = normalizeRoundTally(payload);
+  if (!tally) {
+    return;
+  }
+
+  const gameId = tally.gameId;
+  if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
+    return;
+  }
+  if (gameId && !state.gameId) {
+    state.gameId = gameId;
+  }
+
+  clearTimer();
+  setTimerDisplay(null, turnDuration());
+  state.selected.clear();
+  state.phase = "on-round-tally";
+  state.showRerollBar = false;
+  state.showAckBar = true;
+  resetRerollSlots();
+  state.awaitingOpeningTallyAck = true;
+  state.loserId = tally.loserId ?? null;
+  state.winnerId = tally.winnerId ?? null;
+  if (tally.ranking.length) {
+    state.ranking = tally.ranking;
+    renderRanking();
+  }
+  if (tally.phase != null) {
+    const phase = Number(tally.phase);
+    if (Number.isFinite(phase) && phase > 0) {
+      state.round = phase;
+    }
+  }
+  if (tally.currentPlayerId) {
+    state.currentPlayerId = tally.currentPlayerId;
+  }
+
+  applyTallyArrangements(tally);
+
+  const loser = playerById(state.loserId) ?? state.players.find((player) => playerMatches(player, state.loserId));
+  const loserLabel = loser?.name ?? state.loserId ?? "unknown";
+  setRankingNote(`${loserLabel} ranked last.`);
+  setStatus(`Round tally complete. Loser: ${state.loserId ?? loserLabel}. Confirm to continue.`);
+  renderPlayers();
+  renderOpponentBoards();
+  renderBoard();
+}
+
+export function applyGameOver(payload) {
+  setGamePhase("onGameOver");
+  const tally = normalizeRoundTally(payload);
+  if (!tally) {
+    return;
+  }
+
+  const gameId = tally.gameId;
+  if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
+    return;
+  }
+  if (gameId && !state.gameId) {
+    state.gameId = gameId;
+  }
+
+  clearTimer();
+  setTimerDisplay(null, turnDuration());
+  state.selected.clear();
+  state.phase = "game-over";
+  state.showRerollBar = false;
+  state.showAckBar = true;
+  resetRerollSlots();
+  state.awaitingOpeningTallyAck = true;
+  state.loserId = tally.loserId ?? null;
+  state.winnerId = tally.winnerId ?? null;
+  if (tally.ranking.length) {
+    state.ranking = tally.ranking;
+    renderRanking();
+  }
+  if (tally.phase != null) {
+    const phase = Number(tally.phase);
+    if (Number.isFinite(phase) && phase > 0) {
+      state.round = phase;
+    }
+  }
+  if (tally.currentPlayerId) {
+    state.currentPlayerId = tally.currentPlayerId;
+  }
+
+  applyTallyArrangements(tally);
+
+  const winner = playerById(state.winnerId) ?? state.players.find((player) => playerMatches(player, state.winnerId));
+  const winnerLabel = winner?.name ?? state.winnerId ?? "unknown";
+  setRankingNote(`${winnerLabel} won the game.`);
+  setStatus(`Game over. Winner: ${state.winnerId ?? winnerLabel}. Confirm to continue.`);
   renderPlayers();
   renderOpponentBoards();
   renderBoard();
@@ -1021,6 +1195,66 @@ async function confirmOpeningTally() {
   }
 }
 
+async function confirmRoundTally() {
+  if (gamePhase !== "onRoundTally") {
+    return;
+  }
+
+  setOpeningTallyOkBusy(true);
+  try {
+    await onRoundTally({ gameId: state.gameId, request: "1" });
+    if (gamePhase !== "onRoundTally") {
+      return;
+    }
+    state.awaitingOpeningTallyAck = false;
+    state.showAckBar = false;
+    state.phase = "waiting";
+    setGamePhase("waiting");
+    setStatus("Round tally confirmed. Waiting for the next turn…");
+    renderBoard();
+  } catch (error) {
+    setOpeningTallyOkBusy(false);
+    if (!isSessionExpiredError(error)) {
+      setStatus(error.message || "Could not confirm round tally.");
+    }
+  }
+}
+
+async function confirmGameOver() {
+  if (gamePhase !== "onGameOver") {
+    return;
+  }
+
+  setOpeningTallyOkBusy(true);
+  try {
+    await onGameOver({ gameId: state.gameId, request: "1" });
+    if (gamePhase !== "onGameOver") {
+      return;
+    }
+    state.awaitingOpeningTallyAck = false;
+    state.showAckBar = false;
+    setStatus(`Game over. Winner: ${state.winnerId ?? "unknown"}.`);
+    renderBoard();
+  } catch (error) {
+    setOpeningTallyOkBusy(false);
+    if (!isSessionExpiredError(error)) {
+      setStatus(error.message || "Could not confirm game over.");
+    }
+  }
+}
+
+async function confirmAcknowledgement() {
+  if (gamePhase === "onGameOver") {
+    await confirmGameOver();
+    return;
+  }
+  if (gamePhase === "onRoundTally") {
+    await confirmRoundTally();
+    return;
+  }
+  await confirmOpeningTally();
+}
+
 export function applyOpeningRolled(payload) {
   setGamePhase("openingRoll");
   const rolls = normalizeOpeningRolled(payload);
@@ -1075,6 +1309,8 @@ async function listenForGameNotifications() {
     await subscribeGameNotifications({
       onOpeningRolled: applyOpeningRolled,
       onOpeningTally: applyOpeningTally,
+      onRoundTally: applyRoundTally,
+      onGameOver: applyGameOver,
       onTurnAssigned: applyChallenge1Select,
       onChallenge1Reroll1: applyChallenge1Reroll1,
       onChallenge1RSelect2: applyNamedGamePhase("challenge1RSelect2"),
@@ -1098,7 +1334,7 @@ export async function enterGame(started) {
       onRerollSubmit: submitChallenge1Reroll,
       onReroll: handleReroll,
       onOpeningTallyOk: confirmOpeningTally,
-      onAcknowledgementOk: confirmOpeningTally,
+      onAcknowledgementOk: confirmAcknowledgement,
       onNewGame: newGame,
     });
     gameReady = true;

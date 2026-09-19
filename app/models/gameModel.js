@@ -19,6 +19,7 @@ export const state = {
   lastHandName: null,
   openingRolls: {},
   loserId: null,
+  winnerId: null,
   awaitingOpeningTallyAck: false,
   showRerollBar: false,
   showAckBar: false,
