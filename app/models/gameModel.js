@@ -133,8 +133,12 @@ export function isLocalPlayer(playerId) {
   return playerMatches(self ?? { id: selfId }, playerId);
 }
 
+export function isReroll1Arrange() {
+  return state.phase === "reroll1" || state.phase === "onReroll1Arrange";
+}
+
 export function canDrag() {
-  if (state.phase === "challenge1-select") {
+  if (state.phase === "challenge1-select" || isReroll1Arrange()) {
     return isLocalPlayer(state.loserId);
   }
   return state.phase === "arrange" && isHumanTurn();
@@ -242,8 +246,8 @@ export function toggleReroll(index) {
 }
 
 export function tryPlace(indices, row, slotIndex) {
-  if (state.phase === "challenge1-select") {
-    if (row === 1) {
+  if (state.phase === "challenge1-select" || isReroll1Arrange()) {
+    if (state.phase === "challenge1-select" && row === 1) {
       return placeOnRerollSlots(indices, slotIndex);
     }
 

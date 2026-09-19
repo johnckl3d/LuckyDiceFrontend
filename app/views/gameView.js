@@ -2,6 +2,7 @@ import {
   canDrag,
   isHumanTurn,
   isLocalPlayer,
+  isReroll1Arrange,
   localPlayerId,
   otherPlayers,
   playerMatches,
@@ -381,8 +382,21 @@ function isAckBarVisible() {
   return Boolean(state.showAckBar) || state.gamePhase === "openingTally";
 }
 
+function isReroll1Phase() {
+  const phase = String(state.gamePhase || "");
+  return (
+    phase === "challenge1Reroll1" ||
+    phase === "reRoll1" ||
+    phase === "onReroll1" ||
+    phase === "onReroll1Arrange"
+  );
+}
+
 function isWaitingBarVisible() {
-  return state.gamePhase === "onTurnAssigned" && !isLocalPlayer(state.loserId);
+  if (isLocalPlayer(state.loserId)) {
+    return false;
+  }
+  return state.gamePhase === "onTurnAssigned" || isReroll1Phase();
 }
 
 export function renderOpeningTallyActions() {
@@ -422,6 +436,7 @@ export function renderOpeningTallyActions() {
   }
   if (els.boardActionsControls) {
     els.boardActionsControls.hidden = tallying || challengeWait || swapped;
+    els.boardActionsControls.classList.toggle("is-submit-end", isReroll1Arrange() && !swapped);
   }
   if (els.submitBtn) {
     els.submitBtn.hidden = tallying || challengeWait || swapped;
@@ -473,7 +488,8 @@ export function renderBoard() {
   const interactive =
     state.phase === "arrange" ||
     state.phase === "select-reroll" ||
-    state.phase === "challenge1-select";
+    state.phase === "challenge1-select" ||
+    isReroll1Arrange();
   const selfId = localPlayerId();
   const selfPlayer = state.players.find((player) => player.id === selfId) ?? { id: selfId };
   const opening = openingRollFor(selfPlayer);
@@ -482,6 +498,7 @@ export function renderBoard() {
     state.phase === "submitting" ||
     state.phase === "opening-tally" ||
     state.phase === "challenge1-wait" ||
+    state.phase === "reroll1" ||
     Boolean(opening);
   const useLiveBoard =
     (interactive || state.phase === "submitting") && Array.isArray(state.values) && state.values.length === 5;
@@ -510,8 +527,10 @@ export function renderBoard() {
   }
 
   const canSubmit =
-    (state.phase === "arrange" && isHumanTurn()) ||
-    (state.phase === "challenge1-select" && isLocalPlayer(state.loserId));
+    state.phase !== "submitting" &&
+    ((state.phase === "arrange" && isHumanTurn()) ||
+      (state.phase === "challenge1-select" && isLocalPlayer(state.loserId)) ||
+      (isReroll1Arrange() && isLocalPlayer(state.loserId)));
   els.submitBtn.disabled = !canSubmit;
   els.rollBtn.hidden = state.phase !== "select-reroll";
   els.rollBtn.disabled = state.phase !== "select-reroll" || !state.reroll.some(Boolean);

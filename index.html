@@ -179,6 +179,12 @@
           <div id="opponent-boards" class="opponent-boards mb-3" hidden></div>
 
           <section class="table-felt rounded-4 p-3 p-md-4" aria-label="Play table">
+            <div class="player-board-header">
+              <div class="player-board-stake text-white">
+                <span class="small text-white-50">Stake</span>
+                <span class="font-monospace ms-1" id="stake-label">—</span>
+              </div>
+            </div>
             <div class="board-row board-row-drop mb-3" data-row="4">
               <div class="board-row-label">row2</div>
               <div class="dice-slots" id="row-4" aria-label="row2"></div>
@@ -217,15 +223,9 @@
                     Reroll selected
                   </button>
                   <div class="timer-block text-white text-end flex-grow-1">
-                    <div class="d-flex justify-content-end align-items-baseline gap-3">
-                      <div>
-                        <span class="small text-white-50">Stake</span>
-                        <span class="font-monospace ms-1" id="stake-label">—</span>
-                      </div>
-                      <div class="d-flex align-items-baseline gap-2">
-                        <span class="small text-white-50">Time</span>
-                        <span class="timer-digits font-monospace" id="timer-label">—</span>
-                      </div>
+                    <div class="d-flex justify-content-end align-items-baseline gap-2">
+                      <span class="small text-white-50">Time</span>
+                      <span class="timer-digits font-monospace" id="timer-label">—</span>
                     </div>
                     <div class="progress mt-1" style="height: 8px" role="timer" aria-label="Turn timer">
                       <div class="progress-bar bg-warning" id="timer-bar" style="width: 0%"></div>

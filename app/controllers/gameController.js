@@ -5,7 +5,7 @@ import {
   openingTally,
   pingEngine,
   rollDice,
-  sendChallenge1Reroll1,
+  reroll1,
   startGame,
   submitHand,
   subscribeGameNotifications,
@@ -19,11 +19,11 @@ import {
   defaultPlayers,
   isHumanTurn,
   isLocalPlayer,
+  isReroll1Arrange,
   normalizePlayer,
   localPlayerId,
   playerById,
   playerMatches,
-  rerollDiceFaces,
   resetBoard,
   resetRerollSlots,
   revertInvalidPlacements,
@@ -75,7 +75,7 @@ function turnDuration() {
   return seconds > 0 ? seconds : TIMER_SECONDS;
 }
 
-function startArrangeTimer() {
+function startArrangeTimer({ autoSubmit = true } = {}) {
   clearTimer();
   const total = turnDuration();
   state.secondsLeft = total;
@@ -85,7 +85,9 @@ function startArrangeTimer() {
     setTimerDisplay(state.secondsLeft, turnDuration());
     if (state.secondsLeft <= 0) {
       clearTimer();
-      await submitCurrentBoard();
+      if (autoSubmit) {
+        await handleSubmit();
+      }
     }
   }, 1000);
 }
@@ -200,7 +202,7 @@ async function handleInstantWin(result) {
   showResult("Instant win", `${winner.name}: sequence 1-2-3-4-5. That wins the game.`);
 }
 
-function openingArrangePayload(target) {
+function diceRowsFromBoard() {
   const row1 = [];
   const row2 = [];
   const unarranged = [];
@@ -215,7 +217,24 @@ function openingArrangePayload(target) {
       unarranged.push(value);
     }
   });
+  return { row1, row2, unarranged };
+}
+
+function openingArrangePayload(target) {
+  const { row1, row2, unarranged } = diceRowsFromBoard();
   return { gameId: state.gameId, target, row1, row2, unarranged };
+}
+
+function reroll1Payload() {
+  const { row1, row2, unarranged } = diceRowsFromBoard();
+  return {
+    gameId: state.gameId,
+    dice: {
+      row1,
+      row2,
+      discarded: unarranged,
+    },
+  };
 }
 
 function restoreArrangeAfterReject(message) {
@@ -229,15 +248,24 @@ function restoreArrangeAfterReject(message) {
 }
 
 async function handleSubmit() {
+  // #region agent log
+  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'B',location:'gameController.js:handleSubmit',message:'submit branch',data:{phase:state.phase,gamePhase:state.gamePhase,isReroll1Arrange:isReroll1Arrange()},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  if (isReroll1Arrange()) {
+    await submitReroll1Arrange();
+    return;
+  }
   await submitOpeningArrange();
 }
 
-async function submitChallenge1Reroll() {
-  if (state.phase !== "challenge1-select" || !isLocalPlayer(state.loserId)) {
+async function submitReroll1Arrange() {
+  if (!isReroll1Arrange() || !isLocalPlayer(state.loserId)) {
+    // #region agent log
+    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'B',location:'gameController.js:submitReroll1Arrange',message:'submit skipped',data:{phase:state.phase,gamePhase:state.gamePhase,isReroll1Arrange:isReroll1Arrange()},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     return;
   }
 
-  const dice = rerollDiceFaces();
   clearTimer();
   state.phase = "submitting";
   setTimerDisplay(0, turnDuration());
@@ -245,7 +273,55 @@ async function submitChallenge1Reroll() {
 
   let response;
   try {
-    response = await sendChallenge1Reroll1({ gameId: state.gameId, dice });
+    const payload = openingArrangePayload("onReroll1Arrange");
+    // #region agent log
+    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'C',location:'gameController.js:submitReroll1Arrange',message:'calling arrangeOpening',data:{payloadTarget:payload.target,gamePhase:state.gamePhase,phase:state.phase},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    response = await arrangeOpening(payload);
+  } catch (error) {
+    if (isSessionExpiredError(error)) {
+      return;
+    }
+    restoreReroll1ArrangeAfterReject(error.message || "Submit was rejected.");
+    return;
+  }
+
+  if (response && response.accepted === false) {
+    restoreReroll1ArrangeAfterReject(response.error || "Submit was rejected.");
+    return;
+  }
+
+  state.selected.clear();
+  if (isReroll1Arrange() || state.gamePhase === "onReroll1Arrange") {
+    return;
+  }
+  state.phase = "waiting";
+  setStatus("Arrangement submitted. Waiting for other players…");
+  renderBoard();
+}
+
+function restoreReroll1ArrangeAfterReject(message) {
+  state.phase = "onReroll1Arrange";
+  setStatus(message);
+  renderBoard();
+  if (isLocalPlayer(state.loserId)) {
+    startArrangeTimer();
+  }
+}
+
+async function submitChallenge1Reroll() {
+  if (state.phase !== "challenge1-select" || !isLocalPlayer(state.loserId)) {
+    return;
+  }
+
+  clearTimer();
+  state.phase = "submitting";
+  setTimerDisplay(0, turnDuration());
+  renderBoard();
+
+  let response;
+  try {
+    response = await reroll1(reroll1Payload());
   } catch (error) {
     if (isSessionExpiredError(error)) {
       return;
@@ -266,6 +342,10 @@ async function submitChallenge1Reroll() {
   state.selected.clear();
   state.showRerollBar = false;
   resetRerollSlots();
+  if (isReroll1Arrange() || state.gamePhase === "onReroll1Arrange") {
+    renderBoard();
+    return;
+  }
   state.phase = "waiting";
   setStatus("Reroll submitted. Waiting for other players…");
   renderBoard();
@@ -284,7 +364,11 @@ async function submitOpeningArrange() {
 
   let response;
   try {
-    response = await arrangeOpening(openingArrangePayload("openingArrange"));
+    const payload = openingArrangePayload("openingArrange");
+    // #region agent log
+    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'E',location:'gameController.js:submitOpeningArrange',message:'calling openingArrange',data:{payloadTarget:payload.target,gamePhase:state.gamePhase,phase:state.phase},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    response = await arrangeOpening(payload);
   } catch (error) {
     if (isSessionExpiredError(error)) {
       return;
@@ -554,14 +638,18 @@ function pick(object, names) {
 }
 
 function parseJsonPayload(payload) {
-  if (typeof payload !== "string") {
-    return payload;
+  let data = payload;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return null;
+    }
   }
-  try {
-    return JSON.parse(payload);
-  } catch {
-    return null;
+  if (data && typeof data === "object" && Array.isArray(data.arguments) && data.arguments.length) {
+    return parseJsonPayload(data.arguments[0]);
   }
+  return data;
 }
 
 function parseDiceValues(raw) {
@@ -621,8 +709,8 @@ export function applyGameDetails(payload) {
   const turnTime = Number(pick(data, ["turnTime", "TurnTime"]));
   if (Number.isFinite(turnTime) && turnTime > 0) {
     state.turnTime = turnTime;
-    if (timerId !== null && state.phase === "arrange") {
-      startArrangeTimer();
+    if (timerId !== null && (state.phase === "arrange" || isReroll1Arrange())) {
+      startArrangeTimer({ autoSubmit: isLocalPlayer(state.loserId) || isHumanTurn() });
     }
   }
 
@@ -770,9 +858,6 @@ export function applyOpeningTally(payload) {
 export function applyChallenge1Select(payload) {
   setGamePhase("onTurnAssigned");
   const tally = normalizeOpeningTally(payload);
-  // #region agent log
-  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d419e7'},body:JSON.stringify({sessionId:'d419e7',runId:'pre-fix',hypothesisId:'F',location:'gameController.js:applyChallenge1Select',message:'challenge1Select notification',data:{ok:Boolean(tally),phase:tally?.phase,loserId:tally?.loserId,gameId:tally?.gameId,stateGameId:state.gameId,localId:localPlayerId()},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!tally) {
     return;
   }
@@ -821,6 +906,84 @@ export function applyChallenge1Select(payload) {
   } else {
     setStatus(`waiting for ${state.loserId ?? loserLabel} to reroll`);
   }
+  renderPlayers();
+  renderOpponentBoards();
+  renderBoard();
+}
+
+function normalizeReRoll1(payload) {
+  const data = parseJsonPayload(payload);
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
+  const dices = pick(data, ["dices", "Dices", "dice", "Dice"]) ?? {};
+  return {
+    gameId: pick(data, ["gameId", "GameId"]),
+    phase: pick(data, ["phase", "Phase"]),
+    loserId: pick(data, ["loserId", "LoserId", "loser", "Loser"]),
+    row1: normalizeRowFaces(pick(dices, ["row1", "Row1"])),
+    row2: normalizeRowFaces(pick(dices, ["row2", "Row2"])),
+    unarranged: normalizeRowFaces(
+      pick(dices, ["reroll1", "Reroll1", "reRoll1", "ReRoll1", "unarranged", "Unarranged"])
+    ),
+  };
+}
+
+export function applyChallenge1Reroll1(payload) {
+  const data = normalizeReRoll1(payload);
+  const phaseName = data?.phase ? String(data.phase) : "onReroll1Arrange";
+  setGamePhase(phaseName);
+  if (!data) {
+    return;
+  }
+
+  const gameId = data.gameId;
+  if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
+    return;
+  }
+  if (gameId && !state.gameId) {
+    state.gameId = gameId;
+  }
+
+  clearTimer();
+  setTimerDisplay(null, turnDuration());
+  state.selected.clear();
+  state.awaitingOpeningTallyAck = false;
+  if (data.loserId) {
+    state.loserId = data.loserId;
+  }
+  resetRerollSlots();
+  state.showRerollBar = false;
+  state.showAckBar = false;
+
+  const localIsLoser = isLocalPlayer(state.loserId);
+  const loser = playerById(state.loserId) ?? state.players.find((player) => playerMatches(player, state.loserId));
+  const loserLabel = loser?.name ?? state.loserId ?? "unknown";
+
+  if (localIsLoser) {
+    const rows = { row1: data.row1, row2: data.row2, unarranged: data.unarranged };
+    const selfId = localPlayerId();
+    setOpeningArrangement(selfId, rows);
+    if (state.loserId && String(state.loserId) !== String(selfId)) {
+      setOpeningArrangement(state.loserId, rows);
+    }
+    const roll = state.openingRolls[selfId] ?? state.openingRolls[state.loserId];
+    if (roll) {
+      state.values = roll.values.slice();
+      state.placements = roll.placements.slice();
+    }
+    state.phase = "onReroll1Arrange";
+    if (state.loserId) {
+      state.currentPlayerId = state.loserId;
+    }
+    setStatus("Challenge 1 · Arrange your reroll, then submit.");
+    startArrangeTimer();
+  } else {
+    state.phase = "challenge1-wait";
+    setStatus(`waiting for ${state.loserId ?? loserLabel} to reroll`);
+  }
+
   renderPlayers();
   renderOpponentBoards();
   renderBoard();
@@ -906,7 +1069,7 @@ async function listenForGameNotifications() {
       onOpeningRolled: applyOpeningRolled,
       onOpeningTally: applyOpeningTally,
       onTurnAssigned: applyChallenge1Select,
-      onChallenge1Reroll1: applyNamedGamePhase("challenge1Reroll1"),
+      onChallenge1Reroll1: applyChallenge1Reroll1,
       onChallenge1RSelect2: applyNamedGamePhase("challenge1RSelect2"),
       onChallenge1Reroll2: applyNamedGamePhase("challenge1Reroll2"),
       onChallengeResolve: applyNamedGamePhase("challengeResolve"),

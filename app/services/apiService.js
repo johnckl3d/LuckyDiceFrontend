@@ -176,6 +176,12 @@ async function ensureConnection(key, path, withAccessToken = false) {
 async function invoke(key, path, method, args = [], withAccessToken = false) {
   const connection = await ensureConnection(key, path, withAccessToken);
   try {
+    // #region agent log
+    if (/arrange|reroll|Reroll/i.test(String(method))) {
+      const first = args?.[0];
+      fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'A',location:'apiService.js:invoke',message:'hub invoke',data:{method,payloadTarget:first?.target ?? null,keys:first && typeof first === 'object' ? Object.keys(first) : []},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
     return await connection.invoke(method, ...args);
   } catch (error) {
     throw hubError(error);
@@ -236,6 +242,12 @@ function bindGameNotificationHandlers(connection) {
   connection.off("OnTurnAssigned");
   connection.off("challenge1Reroll1");
   connection.off("Challenge1Reroll1");
+  connection.off("reroll1");
+  connection.off("Reroll1");
+  connection.off("onReroll1");
+  connection.off("OnReroll1");
+  connection.off("reRoll1");
+  connection.off("ReRoll1");
   connection.off("challenge1RSelect2");
   connection.off("Challenge1RSelect2");
   connection.off("challenge1Reroll2");
@@ -259,6 +271,12 @@ function bindGameNotificationHandlers(connection) {
   if (gameNotificationHandlers?.onChallenge1Reroll1) {
     connection.on("challenge1Reroll1", gameNotificationHandlers.onChallenge1Reroll1);
     connection.on("Challenge1Reroll1", gameNotificationHandlers.onChallenge1Reroll1);
+    connection.on("reroll1", gameNotificationHandlers.onChallenge1Reroll1);
+    connection.on("Reroll1", gameNotificationHandlers.onChallenge1Reroll1);
+    connection.on("onReroll1", gameNotificationHandlers.onChallenge1Reroll1);
+    connection.on("OnReroll1", gameNotificationHandlers.onChallenge1Reroll1);
+    connection.on("reRoll1", gameNotificationHandlers.onChallenge1Reroll1);
+    connection.on("ReRoll1", gameNotificationHandlers.onChallenge1Reroll1);
   }
   if (gameNotificationHandlers?.onChallenge1RSelect2) {
     connection.on("challenge1RSelect2", gameNotificationHandlers.onChallenge1RSelect2);
@@ -336,9 +354,28 @@ export async function openingTally(payload) {
   );
 }
 
-export async function sendChallenge1Reroll1(payload) {
-  const dice = Array.isArray(payload?.dice) ? payload.dice.map(String) : [];
-  return invoke("game", "/hubs/game", "challenge1Reroll1", [{ gameId: payload?.gameId, dice }], true);
+function asStringArray(value) {
+  return Array.isArray(value) ? value.map(String) : [];
+}
+
+export async function reroll1(payload) {
+  const dice = payload?.dice ?? {};
+  return invoke(
+    "game",
+    "/hubs/game",
+    "reroll1",
+    [
+      {
+        gameId: payload?.gameId,
+        dice: {
+          row1: asStringArray(dice.row1),
+          row2: asStringArray(dice.row2),
+          discarded: asStringArray(dice.discarded),
+        },
+      },
+    ],
+    true
+  );
 }
 
 export async function tallyHands(payload) {
