@@ -93,9 +93,9 @@ export function setOpeningArrangement(playerId, rows) {
     });
   };
 
-  add(rows?.row1, 3);
-  add(rows?.row2, 4);
-  add(rows?.unarranged, 2);
+  add(rows?.set1 ?? rows?.row1, 3);
+  add(rows?.set2 ?? rows?.row2, 4);
+  add(rows?.flux ?? rows?.unarranged, 2);
 
   state.openingRolls[playerId] = { values, placements };
 }

@@ -340,8 +340,35 @@ export async function submitHand(payload) {
   return invoke("game", "/hubs/game", "Submit", [payload]);
 }
 
+function asStringArray(value) {
+  return Array.isArray(value) ? value.map(String) : [];
+}
+
+function boardDicePayload(payload) {
+  return {
+    set1: asStringArray(payload?.set1),
+    set2: asStringArray(payload?.set2),
+    flux: asStringArray(payload?.flux),
+  };
+}
+
 export async function arrangeOpening(payload) {
   return invoke("game", "/hubs/game", "openingArrange", [payload], true);
+}
+
+export async function reroll1Arrange(payload) {
+  return invoke(
+    "game",
+    "/hubs/game",
+    "reroll1Arrange",
+    [
+      {
+        gameId: payload?.gameId,
+        ...boardDicePayload(payload),
+      },
+    ],
+    true
+  );
 }
 
 export async function openingTally(payload) {
@@ -349,13 +376,15 @@ export async function openingTally(payload) {
     "game",
     "/hubs/game",
     "openingTally",
-    [{ gameId: payload?.gameId, request: payload?.request ?? "1" }],
+    [
+      {
+        gameId: payload?.gameId,
+        request: payload?.request ?? "1",
+        ...boardDicePayload(payload),
+      },
+    ],
     true
   );
-}
-
-function asStringArray(value) {
-  return Array.isArray(value) ? value.map(String) : [];
 }
 
 export async function reroll1(payload) {
@@ -368,8 +397,8 @@ export async function reroll1(payload) {
       {
         gameId: payload?.gameId,
         dice: {
-          row1: asStringArray(dice.row1),
-          row2: asStringArray(dice.row2),
+          set1: asStringArray(dice.set1),
+          set2: asStringArray(dice.set2),
           discarded: asStringArray(dice.discarded),
         },
       },

@@ -15,9 +15,9 @@ let handlers = {};
 const els = {
   engineStatus: document.getElementById("engine-status"),
   turnStatus: document.getElementById("turn-status"),
-  row2: document.getElementById("row-2"),
-  row3: document.getElementById("row-3"),
-  row4: document.getElementById("row-4"),
+  flux: document.getElementById("flux"),
+  set1: document.getElementById("set1"),
+  set2: document.getElementById("set2"),
   opponentBoards: document.getElementById("opponent-boards"),
   actionBar: document.getElementById("actionBar"),
   actionBarLabel: document.getElementById("action-bar-label"),
@@ -316,9 +316,9 @@ function createOpponentBoard(player) {
   card.appendChild(title);
 
   [
-    { row: 4, label: "row2" },
-    { row: 3, label: "row1" },
-    { row: 2, label: "unarranged" },
+    { row: 4, label: "set2" },
+    { row: 3, label: "set1" },
+    { row: 2, label: "flux" },
   ].forEach(({ row, label }) => {
     const boardRow = document.createElement("div");
     boardRow.className = "board-row mb-2";
@@ -330,6 +330,8 @@ function createOpponentBoard(player) {
 
     const slots = document.createElement("div");
     slots.className = "dice-slots";
+    slots.id = `${player.id}-${label}`;
+    slots.setAttribute("aria-label", label);
     appendRowSlots(slots, row, roll, true, true);
 
     boardRow.append(rowLabel, slots);
@@ -480,7 +482,7 @@ export function setOpeningTallyOkBusy(busy) {
 }
 
 export function renderBoard() {
-  const hosts = { 2: els.row2, 3: els.row3, 4: els.row4 };
+  const hosts = { 2: els.flux, 3: els.set1, 4: els.set2 };
   Object.values(hosts).forEach((row) => {
     row.innerHTML = "";
   });

@@ -6,6 +6,7 @@ import {
   pingEngine,
   rollDice,
   reroll1,
+  reroll1Arrange,
   startGame,
   submitHand,
   subscribeGameNotifications,
@@ -26,6 +27,7 @@ import {
   playerMatches,
   resetBoard,
   resetRerollSlots,
+  rerollDiceFaces,
   revertInvalidPlacements,
   setOpeningArrangement,
   setOpeningRoll,
@@ -170,7 +172,7 @@ async function takeRoll(held) {
   if (isHumanTurn()) {
     state.phase = "arrange";
     setStatus(
-      `Round ${state.round} · Your turn · ${result.handName}. Drag a pair to row1 (second pair to row2), then submit.`
+      `Round ${state.round} · Your turn · ${result.handName}. Drag a pair to set1 (second pair to set2), then submit.`
     );
     renderPlayers();
     renderBoard();
@@ -203,36 +205,41 @@ async function handleInstantWin(result) {
 }
 
 function diceRowsFromBoard() {
-  const row1 = [];
-  const row2 = [];
-  const unarranged = [];
+  const set1 = [];
+  const set2 = [];
+  const flux = [];
   state.values.forEach((face, index) => {
     const row = state.placements[index];
     const value = String(face);
     if (row === 3) {
-      row1.push(value);
+      set1.push(value);
     } else if (row === 4) {
-      row2.push(value);
+      set2.push(value);
     } else {
-      unarranged.push(value);
+      flux.push(value);
     }
   });
-  return { row1, row2, unarranged };
+  return { set1, set2, flux };
 }
 
 function openingArrangePayload(target) {
-  const { row1, row2, unarranged } = diceRowsFromBoard();
-  return { gameId: state.gameId, target, row1, row2, unarranged };
+  const { set1, set2, flux } = diceRowsFromBoard();
+  return { gameId: state.gameId, target, set1, set2, flux };
+}
+
+function boardDicePayload() {
+  const { set1, set2, flux } = diceRowsFromBoard();
+  return { gameId: state.gameId, set1, set2, flux };
 }
 
 function reroll1Payload() {
-  const { row1, row2, unarranged } = diceRowsFromBoard();
+  const { set1, set2 } = diceRowsFromBoard();
   return {
     gameId: state.gameId,
     dice: {
-      row1,
-      row2,
-      discarded: unarranged,
+      set1,
+      set2,
+      discarded: rerollDiceFaces(),
     },
   };
 }
@@ -273,11 +280,11 @@ async function submitReroll1Arrange() {
 
   let response;
   try {
-    const payload = openingArrangePayload("onReroll1Arrange");
+    const payload = boardDicePayload();
     // #region agent log
-    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'C',location:'gameController.js:submitReroll1Arrange',message:'calling arrangeOpening',data:{payloadTarget:payload.target,gamePhase:state.gamePhase,phase:state.phase},timestamp:Date.now()})}).catch(()=>{});
+    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e24ed7'},body:JSON.stringify({sessionId:'e24ed7',runId:'pre-fix',hypothesisId:'C',location:'gameController.js:submitReroll1Arrange',message:'calling reroll1Arrange',data:{gamePhase:state.gamePhase,phase:state.phase},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
-    response = await arrangeOpening(payload);
+    response = await reroll1Arrange(payload);
   } catch (error) {
     if (isSessionExpiredError(error)) {
       return;
@@ -749,9 +756,9 @@ function normalizeOpeningTally(payload) {
       }
       return {
         playerId,
-        row1: normalizeRowFaces(pick(item, ["row1", "Row1"])),
-        row2: normalizeRowFaces(pick(item, ["row2", "Row2"])),
-        unarranged: normalizeRowFaces(pick(item, ["unarranged", "Unarranged"])),
+        set1: normalizeRowFaces(pick(item, ["set1", "Set1", "row1", "Row1"])),
+        set2: normalizeRowFaces(pick(item, ["set2", "Set2", "row2", "Row2"])),
+        flux: normalizeRowFaces(pick(item, ["flux", "Flux", "unarranged", "Unarranged"])),
         values: pick(item, ["values", "Values"]),
       };
     })
@@ -777,7 +784,7 @@ function applyTallyArrangements(tally) {
   tally.players.forEach((entry) => {
     const player = state.players.find((item) => playerMatches(item, entry.playerId));
     const playerId = player?.id ?? entry.playerId;
-    const hasRows = entry.row1.length || entry.row2.length || entry.unarranged.length;
+    const hasRows = entry.set1.length || entry.set2.length || entry.flux.length;
     if (hasRows) {
       setOpeningArrangement(playerId, entry);
       if (String(playerId) !== String(entry.playerId)) {
@@ -922,10 +929,10 @@ function normalizeReRoll1(payload) {
     gameId: pick(data, ["gameId", "GameId"]),
     phase: pick(data, ["phase", "Phase"]),
     loserId: pick(data, ["loserId", "LoserId", "loser", "Loser"]),
-    row1: normalizeRowFaces(pick(dices, ["row1", "Row1"])),
-    row2: normalizeRowFaces(pick(dices, ["row2", "Row2"])),
-    unarranged: normalizeRowFaces(
-      pick(dices, ["reroll1", "Reroll1", "reRoll1", "ReRoll1", "unarranged", "Unarranged"])
+    set1: normalizeRowFaces(pick(dices, ["set1", "Set1", "row1", "Row1"])),
+    set2: normalizeRowFaces(pick(dices, ["set2", "Set2", "row2", "Row2"])),
+    flux: normalizeRowFaces(
+      pick(dices, ["flux", "Flux", "reroll1", "Reroll1", "reRoll1", "ReRoll1", "unarranged", "Unarranged", "discarded", "Discarded"])
     ),
   };
 }
@@ -962,7 +969,7 @@ export function applyChallenge1Reroll1(payload) {
   const loserLabel = loser?.name ?? state.loserId ?? "unknown";
 
   if (localIsLoser) {
-    const rows = { row1: data.row1, row2: data.row2, unarranged: data.unarranged };
+    const rows = { set1: data.set1, set2: data.set2, flux: data.flux };
     const selfId = localPlayerId();
     setOpeningArrangement(selfId, rows);
     if (state.loserId && String(state.loserId) !== String(selfId)) {
@@ -996,7 +1003,7 @@ async function confirmOpeningTally() {
 
   setOpeningTallyOkBusy(true);
   try {
-    await openingTally({ gameId: state.gameId, request: "1" });
+    await openingTally({ ...boardDicePayload(), request: "1" });
     if (gamePhase !== "openingTally") {
       return;
     }
@@ -1046,7 +1053,7 @@ export function applyOpeningRolled(payload) {
       } else if (phaseOk || state.phase === "arrange") {
         state.phase = "arrange";
         setStatus(
-          `Round ${state.round} · Your turn · ${roll.handName || "opening roll"}. Drag a pair to row1 (second pair to row2), then submit.`
+          `Round ${state.round} · Your turn · ${roll.handName || "opening roll"}. Drag a pair to set1 (second pair to set2), then submit.`
         );
         startArrangeTimer();
       }
