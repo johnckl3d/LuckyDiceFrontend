@@ -56,8 +56,8 @@ async function handleCreate() {
     showLobbyError("Turn time must be 30 or 300 seconds.");
     return;
   }
-  if (body.stake < 0) {
-    showLobbyError("Stake cannot be negative.");
+  if (body.stake !== 10 && body.stake !== 30 && body.stake !== 50) {
+    showLobbyError("Stake must be 10, 30, or 50.");
     return;
   }
 

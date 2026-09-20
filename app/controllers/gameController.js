@@ -2,8 +2,9 @@ import {
   arrangeOpening,
   isSessionExpiredError,
   joinGame,
+  leaveGame as invokeLeaveGame,
   openingTally,
-  onGameOver,
+  onJoinGame,
   onRoundTally,
   pingEngine,
   rollDice,
@@ -589,6 +590,8 @@ export function leaveGame() {
   clearTimer();
   hideResult();
   state.awaitingOpeningTallyAck = false;
+  state.showResultBar = false;
+  state.showResultBarActions = false;
   setGamePhase(null);
   state.loserId = null;
   state.winnerId = null;
@@ -596,16 +599,22 @@ export function leaveGame() {
   showGameScreen(false);
 }
 
-function applyStartedGame(started) {
-  const sameGame = started.gameId && String(state.gameId) === String(started.gameId);
+function initializeGameView(started) {
+  if (!started) {
+    return;
+  }
+
+  const gameId = started.gameId ?? started.GameId ?? state.gameId;
+  const sameGame = gameId && state.gameId && String(state.gameId) === String(gameId);
   const preservedTurnTime = sameGame ? state.turnTime : 0;
   const preservedStake = sameGame ? state.stake : null;
+  const turnTime = Number(started.turnTime ?? started.TurnTime);
+  const stake = started.stake ?? started.Stake;
 
   clearTimer();
   hideResult();
-  setTimerDisplay(null, turnDuration());
   state.ranking = [];
-  state.round = started.round ?? 1;
+  state.round = started.round ?? started.Round ?? 1;
   state.phase = "idle";
   setGamePhase(null);
   state.selected.clear();
@@ -613,19 +622,35 @@ function applyStartedGame(started) {
   state.loserId = null;
   state.winnerId = null;
   state.awaitingOpeningTallyAck = false;
-  state.turnTime = preservedTurnTime;
-  state.stake = preservedStake;
-  setStakeDisplay(preservedStake);
+  state.turnTime = Number.isFinite(turnTime) && turnTime > 0 ? turnTime : preservedTurnTime;
+  state.stake = stake != null ? stake : preservedStake;
+  setTimerDisplay(null, turnDuration());
+  setStakeDisplay(state.stake);
   setRankingNote("After everyone submits round 1, the lowest hand rolls in round 2.");
   renderRanking();
 
-  state.gameId = started.gameId;
-  state.players = (started.players ?? []).map(normalizePlayer);
-  state.currentPlayerId = started.currentPlayerId;
+  if (gameId) {
+    state.gameId = gameId;
+  }
+  const rawPlayers = started.players ?? started.Players;
+  if (Array.isArray(rawPlayers)) {
+    state.players = rawPlayers.map(normalizePlayer);
+  }
+  const currentPlayerId = started.currentPlayerId ?? started.CurrentPlayerId;
+  if (currentPlayerId != null) {
+    state.currentPlayerId = currentPlayerId;
+  }
+
   resetBoard();
   renderPlayers();
+  renderOpponentBoards();
   renderBoard();
-  applyGameDetails(started);
+  showGameScreen(true);
+  setStatus("Game started. Waiting for opening roll…");
+}
+
+function applyStartedGame(started) {
+  initializeGameView(started);
 }
 
 function pick(object, names) {
@@ -702,23 +727,8 @@ export function applyGameDetails(payload) {
   if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
     return;
   }
-  if (gameId && !state.gameId) {
-    state.gameId = gameId;
-  }
 
-  const turnTime = Number(pick(data, ["turnTime", "TurnTime"]));
-  if (Number.isFinite(turnTime) && turnTime > 0) {
-    state.turnTime = turnTime;
-    if (timerId !== null && (state.phase === "arrange" || isReroll1Arrange())) {
-      startArrangeTimer({ autoSubmit: isLocalPlayer(state.loserId) || isHumanTurn() });
-    }
-  }
-
-  const stake = pick(data, ["stake", "Stake"]);
-  if (stake != null) {
-    state.stake = stake;
-    setStakeDisplay(stake);
-  }
+  initializeGameView({ ...data, gameId: gameId ?? state.gameId });
 }
 
 function normalizeRowFaces(raw) {
@@ -907,6 +917,8 @@ export function applyOpeningTally(payload) {
   state.phase = "opening-tally";
   state.showRerollBar = false;
   state.showAckBar = true;
+  state.showResultBar = false;
+  state.showResultBarActions = false;
   resetRerollSlots();
   state.awaitingOpeningTallyAck = true;
   state.loserId = tally.loserId ?? null;
@@ -957,6 +969,8 @@ export function applyRoundTally(payload) {
   state.phase = "on-round-tally";
   state.showRerollBar = false;
   state.showAckBar = true;
+  state.showResultBar = false;
+  state.showResultBarActions = false;
   resetRerollSlots();
   state.awaitingOpeningTallyAck = true;
   state.loserId = tally.loserId ?? null;
@@ -1006,9 +1020,11 @@ export function applyGameOver(payload) {
   state.selected.clear();
   state.phase = "game-over";
   state.showRerollBar = false;
-  state.showAckBar = true;
+  state.showAckBar = false;
+  state.showResultBar = true;
+  state.showResultBarActions = false;
   resetRerollSlots();
-  state.awaitingOpeningTallyAck = true;
+  state.awaitingOpeningTallyAck = false;
   state.loserId = tally.loserId ?? null;
   state.winnerId = tally.winnerId ?? null;
   if (tally.ranking.length) {
@@ -1030,9 +1046,23 @@ export function applyGameOver(payload) {
   const winner = playerById(state.winnerId) ?? state.players.find((player) => playerMatches(player, state.winnerId));
   const winnerLabel = winner?.name ?? state.winnerId ?? "unknown";
   setRankingNote(`${winnerLabel} won the game.`);
-  setStatus(`Game over. Winner: ${state.winnerId ?? winnerLabel}. Confirm to continue.`);
+  setStatus(`Game over. Winner: ${state.winnerId ?? winnerLabel}.`);
   renderPlayers();
   renderOpponentBoards();
+  renderBoard();
+}
+
+export function applyWaitingPlayers(payload) {
+  const data = parseJsonPayload(payload);
+  const tally = data?.tally && typeof data.tally === "object" ? data.tally : {};
+  const phase = Number(pick(data, ["phase", "Phase"]) ?? pick(tally, ["phase", "Phase"]));
+  const gameId = pick(data, ["gameId", "GameId"]) ?? pick(tally, ["gameId", "GameId"]);
+  if (phase === 10 && gameId) {
+    state.gameId = gameId;
+  }
+  state.showResultBar = true;
+  state.showResultBarActions = true;
+  setStatus("Waiting for players. Leave the table or start a new game.");
   renderBoard();
 }
 
@@ -1220,39 +1250,43 @@ async function confirmRoundTally() {
   }
 }
 
-async function confirmGameOver() {
-  if (gamePhase !== "onGameOver") {
-    return;
-  }
-
-  setOpeningTallyOkBusy(true);
-  try {
-    await onGameOver({ gameId: state.gameId, request: "1" });
-    if (gamePhase !== "onGameOver") {
-      return;
-    }
-    state.awaitingOpeningTallyAck = false;
-    state.showAckBar = false;
-    setStatus(`Game over. Winner: ${state.winnerId ?? "unknown"}.`);
-    renderBoard();
-  } catch (error) {
-    setOpeningTallyOkBusy(false);
-    if (!isSessionExpiredError(error)) {
-      setStatus(error.message || "Could not confirm game over.");
-    }
-  }
-}
-
 async function confirmAcknowledgement() {
-  if (gamePhase === "onGameOver") {
-    await confirmGameOver();
-    return;
-  }
   if (gamePhase === "onRoundTally") {
     await confirmRoundTally();
     return;
   }
   await confirmOpeningTally();
+}
+
+async function leaveTable() {
+  try {
+    await invokeLeaveGame({
+      gameId: state.gameId,
+      playerId: localPlayerId(),
+    });
+  } catch (error) {
+    if (!isSessionExpiredError(error)) {
+      setStatus(error.message || "Could not leave the table.");
+      return;
+    }
+  }
+  const { enterLobby } = await import("./lobbyController.js");
+  enterLobby();
+}
+
+async function joinResultGame() {
+  try {
+    await onJoinGame({
+      gameId: state.gameId,
+      playerId: localPlayerId(),
+      request: 1,
+    });
+    setStatus("Joining the next game…");
+  } catch (error) {
+    if (!isSessionExpiredError(error)) {
+      setStatus(error.message || "Could not join a new game.");
+    }
+  }
 }
 
 export function applyOpeningRolled(payload) {
@@ -1311,6 +1345,7 @@ async function listenForGameNotifications() {
       onOpeningTally: applyOpeningTally,
       onRoundTally: applyRoundTally,
       onGameOver: applyGameOver,
+      onWaitingPlayers: applyWaitingPlayers,
       onTurnAssigned: applyChallenge1Select,
       onChallenge1Reroll1: applyChallenge1Reroll1,
       onChallenge1RSelect2: applyNamedGamePhase("challenge1RSelect2"),
@@ -1335,6 +1370,8 @@ export async function enterGame(started) {
       onReroll: handleReroll,
       onOpeningTallyOk: confirmOpeningTally,
       onAcknowledgementOk: confirmAcknowledgement,
+      onLeaveTable: leaveTable,
+      onResultNewGame: joinResultGame,
       onNewGame: newGame,
     });
     gameReady = true;

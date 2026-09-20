@@ -109,6 +109,7 @@ body {
 
 #rerollActionBar:not([hidden]),
 #acknowledgementActionBar:not([hidden]),
+#resultActionBar:not([hidden]),
 #waitingActionBar:not([hidden]) {
   display: flex;
   flex-wrap: wrap;
@@ -124,12 +125,21 @@ body {
   gap: 1.5rem;
 }
 
-.acknowledgement-ok-btn {
+.acknowledgement-ok-btn,
+.result-bar-actions {
   margin-left: auto;
+}
+
+.result-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 #rerollActionBar[hidden],
 #acknowledgementActionBar[hidden],
+#resultActionBar[hidden],
 #waitingActionBar[hidden],
 #actionBar[hidden] {
   display: none !important;

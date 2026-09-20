@@ -26,6 +26,11 @@ const els = {
   acknowledgementLoser: document.getElementById("acknowledgement-loser"),
   acknowledgementWinner: document.getElementById("acknowledgement-winner"),
   acknowledgementOkBtn: document.getElementById("acknowledgement-ok-btn"),
+  resultActionBar: document.getElementById("resultActionBar"),
+  resultLoser: document.getElementById("result-loser"),
+  resultWinner: document.getElementById("result-winner"),
+  resultLeaveTableBtn: document.getElementById("resultbar-leave-table-btn"),
+  resultBarNewGameBtn: document.getElementById("resultbar-new-game-btn"),
   waitingActionBar: document.getElementById("waitingActionBar"),
   waitingBarMessage: document.getElementById("waiting-bar-message"),
   rerollSlots: document.getElementById("reroll-slots"),
@@ -164,6 +169,12 @@ export function bindGameView(nextHandlers) {
   els.rerollSubmitBtn?.addEventListener("click", () => handlers.onRerollSubmit?.());
   els.acknowledgementOkBtn?.addEventListener("click", () => {
     handlers.onAcknowledgementOk?.();
+  });
+  els.resultLeaveTableBtn?.addEventListener("click", () => {
+    handlers.onLeaveTable?.();
+  });
+  els.resultBarNewGameBtn?.addEventListener("click", () => {
+    handlers.onResultNewGame?.();
   });
   els.rollBtn.addEventListener("click", () => handlers.onReroll?.());
   els.openingTallyOkBtn?.addEventListener("click", () => {
@@ -382,15 +393,15 @@ function isRerollBarVisible() {
 }
 
 function isAckPhase() {
-  return (
-    state.gamePhase === "openingTally" ||
-    state.gamePhase === "onRoundTally" ||
-    state.gamePhase === "onGameOver"
-  );
+  return state.gamePhase === "openingTally" || state.gamePhase === "onRoundTally";
 }
 
 function isAckBarVisible() {
-  return Boolean(state.showAckBar) || isAckPhase();
+  return !isResultBarVisible() && (Boolean(state.showAckBar) || isAckPhase());
+}
+
+function isResultBarVisible() {
+  return Boolean(state.showResultBar) || state.gamePhase === "onGameOver";
 }
 
 function isReroll1Phase() {
@@ -414,9 +425,10 @@ export function renderOpeningTallyActions() {
   const tallying = state.gamePhase === "openingTally";
   const challengeWait = state.phase === "challenge1-wait";
   const rerollBar = isRerollBarVisible();
+  const resultBar = isResultBarVisible();
   const ackBar = isAckBarVisible();
-  const waitingBar = isWaitingBarVisible() && !ackBar && !rerollBar;
-  const swapped = rerollBar || ackBar || waitingBar;
+  const waitingBar = isWaitingBarVisible() && !ackBar && !rerollBar && !resultBar;
+  const swapped = rerollBar || ackBar || waitingBar || resultBar;
 
   if (els.actionBar) {
     els.actionBar.hidden = swapped;
@@ -427,17 +439,22 @@ export function renderOpeningTallyActions() {
   if (els.acknowledgementActionBar) {
     els.acknowledgementActionBar.hidden = !ackBar;
   }
+  if (els.resultActionBar) {
+    els.resultActionBar.hidden = !resultBar;
+  }
   if (els.waitingActionBar) {
     els.waitingActionBar.hidden = !waitingBar;
   }
   if (els.actionBarLabel) {
     els.actionBarLabel.textContent = rerollBar
       ? "reroll"
-      : ackBar
-        ? "acknowledgementBar"
-        : waitingBar
-          ? "waitingBar"
-          : "actionBar";
+      : resultBar
+        ? "resultBar"
+        : ackBar
+          ? "acknowledgementBar"
+          : waitingBar
+            ? "waitingBar"
+            : "actionBar";
   }
   if (els.openingTallyActions) {
     els.openingTallyActions.hidden = !tallying || swapped;
@@ -460,6 +477,19 @@ export function renderOpeningTallyActions() {
   }
   if (els.acknowledgementWinner) {
     els.acknowledgementWinner.textContent = ackBar ? winnerId : "—";
+  }
+  if (els.resultLoser) {
+    els.resultLoser.textContent = resultBar ? loserId : "—";
+  }
+  if (els.resultWinner) {
+    els.resultWinner.textContent = resultBar ? winnerId : "—";
+  }
+  const showResultActions = resultBar && Boolean(state.showResultBarActions);
+  if (els.resultLeaveTableBtn) {
+    els.resultLeaveTableBtn.hidden = !showResultActions;
+  }
+  if (els.resultBarNewGameBtn) {
+    els.resultBarNewGameBtn.hidden = !showResultActions;
   }
   if (els.waitingBarMessage) {
     els.waitingBarMessage.textContent = waitingBar

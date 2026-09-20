@@ -252,6 +252,8 @@ function bindGameNotificationHandlers(connection) {
   connection.off("OnRoundTally");
   connection.off("onGameOver");
   connection.off("OnGameOver");
+  connection.off("onWaitingPlayers");
+  connection.off("OnWaitingPlayers");
   connection.off("gameDetails");
   connection.off("GameDetails");
   if (gameNotificationHandlers?.onOpeningRolled) {
@@ -296,6 +298,10 @@ function bindGameNotificationHandlers(connection) {
     connection.on("onGameOver", gameNotificationHandlers.onGameOver);
     connection.on("OnGameOver", gameNotificationHandlers.onGameOver);
   }
+  if (gameNotificationHandlers?.onWaitingPlayers) {
+    connection.on("onWaitingPlayers", gameNotificationHandlers.onWaitingPlayers);
+    connection.on("OnWaitingPlayers", gameNotificationHandlers.onWaitingPlayers);
+  }
   if (gameNotificationHandlers?.onGameDetails) {
     connection.on("gameDetails", gameNotificationHandlers.onGameDetails);
     connection.on("GameDetails", gameNotificationHandlers.onGameDetails);
@@ -331,7 +337,7 @@ export async function leaveLobbyGame(gameId) {
 }
 
 export async function joinGame(gameId) {
-  return invoke("game", "/hubs/game", "join", [{ gameId }], true);
+  return invoke("game", "/hubs/game", "joinGame", [{ gameId }], true);
 }
 
 export async function startGame(players) {
@@ -417,6 +423,37 @@ export async function onGameOver(payload) {
       {
         gameId: payload?.gameId,
         request: payload?.request ?? "1",
+      },
+    ],
+    true
+  );
+}
+
+export async function onJoinGame(payload) {
+  return invoke(
+    "game",
+    "/hubs/game",
+    "joinGame",
+    [
+      {
+        gameId: payload?.gameId,
+        playerId: payload?.playerId,
+        request: Number(payload?.request ?? 1),
+      },
+    ],
+    true
+  );
+}
+
+export async function leaveGame(payload) {
+  return invoke(
+    "game",
+    "/hubs/game",
+    "leaveGame",
+    [
+      {
+        gameId: payload?.gameId,
+        playerId: payload?.playerId,
       },
     ],
     true

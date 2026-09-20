@@ -23,6 +23,8 @@ export const state = {
   awaitingOpeningTallyAck: false,
   showRerollBar: false,
   showAckBar: false,
+  showResultBar: false,
+  showResultBarActions: false,
   rerollSlots: [null, null, null, null, null],
 };
 
@@ -157,6 +159,8 @@ export function resetBoard(values = [1, 1, 1, 1, 1]) {
   state.reroll = [false, false, false, false, false];
   state.showRerollBar = false;
   state.showAckBar = false;
+  state.showResultBar = false;
+  state.showResultBarActions = false;
   resetRerollSlots();
   state.lastHandName = null;
 }

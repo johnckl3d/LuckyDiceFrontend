@@ -95,15 +95,11 @@
                   </div>
                   <div class="mb-3">
                     <label class="form-label" for="create-stake">Stake</label>
-                    <input
-                      class="form-control"
-                      id="create-stake"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value="0"
-                      required
-                    />
+                    <select class="form-select" id="create-stake">
+                      <option value="10" selected>10</option>
+                      <option value="30">30</option>
+                      <option value="50">50</option>
+                    </select>
                   </div>
                   <div class="alert alert-danger d-none" id="lobby-error" role="alert"></div>
                   <button type="submit" class="btn btn-dark w-100" id="create-game-btn">
@@ -253,6 +249,26 @@
                 <button type="button" class="btn btn-warning btn-lg px-4 acknowledgement-ok-btn" id="acknowledgement-ok-btn">
                   Ok
                 </button>
+              </div>
+              <div id="resultActionBar" class="action-bar result-action-bar" aria-label="resultBar" hidden>
+                <div class="acknowledgement-labels text-white">
+                  <div>
+                    <span class="small text-white-50">Loser :</span>
+                    <span class="font-monospace ms-2" id="result-loser">—</span>
+                  </div>
+                  <div>
+                    <span class="small text-white-50">Winner :</span>
+                    <span class="font-monospace ms-2" id="result-winner">—</span>
+                  </div>
+                </div>
+                <div class="result-bar-actions">
+                  <button type="button" class="btn btn-outline-light btn-lg px-4" id="resultbar-leave-table-btn" hidden>
+                    Leave table
+                  </button>
+                  <button type="button" class="btn btn-warning btn-lg px-4" id="resultbar-new-game-btn" hidden>
+                    New game
+                  </button>
+                </div>
               </div>
               <div id="waitingActionBar" class="action-bar waiting-action-bar" aria-label="waitingBar" hidden>
                 <div class="text-white waiting-bar-message" id="waiting-bar-message">
