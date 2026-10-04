@@ -32,11 +32,14 @@ body {
 
 .player-board-header {
   display: flex;
-  justify-content: flex-end;
-  align-items: baseline;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
   margin-bottom: 0.5rem;
 }
 
+.player-board-wallet,
 .player-board-stake {
   font-variant-numeric: tabular-nums;
 }

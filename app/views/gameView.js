@@ -50,6 +50,8 @@ const els = {
   timerLabel: document.getElementById("timer-label"),
   timerBar: document.getElementById("timer-bar"),
   stakeLabel: document.getElementById("stake-label"),
+  walletLabel: document.getElementById("game-wallet-balance"),
+  topUpBtn: document.getElementById("game-topup-btn"),
   resultTitle: document.getElementById("result-title"),
   resultBody: document.getElementById("result-body"),
   resultNewGameBtn: document.getElementById("result-new-game-btn"),
@@ -182,6 +184,7 @@ export function bindGameView(nextHandlers) {
   });
   els.newGameBtn.addEventListener("click", () => handlers.onNewGame?.());
   els.resultNewGameBtn.addEventListener("click", () => handlers.onNewGame?.());
+  els.topUpBtn?.addEventListener("click", () => handlers.onTopUp?.());
   els.seatCount.addEventListener("change", () => handlers.onNewGame?.());
 
   document.querySelectorAll(".board-row-drop, [data-row='2'], #reroll-slots").forEach((rowEl) => {
@@ -217,14 +220,23 @@ export function setTimerDisplay(seconds, total) {
   els.timerBar.style.width = `${Math.max(0, (seconds / total) * 100)}%`;
 }
 
+function formatMoney(value) {
+  if (value == null || value === "") {
+    return "—";
+  }
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toFixed(2) : String(value);
+}
+
 export function setStakeDisplay(stake) {
-  if (stake == null || stake === "") {
-    els.stakeLabel.textContent = "—";
+  els.stakeLabel.textContent = formatMoney(stake);
+}
+
+export function setWalletDisplay(balance) {
+  if (!els.walletLabel) {
     return;
   }
-
-  const amount = Number(stake);
-  els.stakeLabel.textContent = Number.isFinite(amount) ? amount.toFixed(2) : String(stake);
+  els.walletLabel.textContent = formatMoney(balance);
 }
 
 export function setStatus(text) {

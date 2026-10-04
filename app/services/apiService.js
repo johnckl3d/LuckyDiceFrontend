@@ -1,6 +1,6 @@
 /**
  * LuckyDiceAPI SignalR client.
- * Hubs: /hubs/auth, /hubs/game, /hubs/lobby
+ * Hubs: /hubs/auth, /hubs/game, /hubs/lobby, /hubs/wallet
  */
 
 import { getSession, setSession } from "../models/loginModel.js";
@@ -11,6 +11,7 @@ const connections = {
   auth: null,
   game: null,
   lobby: null,
+  wallet: null,
 };
 
 let lobbyToken = "";
@@ -324,6 +325,18 @@ export async function subscribeGameNotifications(handlers) {
   bindGameNotificationHandlers(connection);
 }
 
+export async function getWalletBalance() {
+  return invoke("wallet", "/hubs/wallet", "GetBalance", [], true);
+}
+
+export async function topUpWallet(amount) {
+  return invoke("wallet", "/hubs/wallet", "TopUp", [{ amount }], true);
+}
+
+export async function withdrawWallet(amount) {
+  return invoke("wallet", "/hubs/wallet", "Withdraw", [{ amount }], true);
+}
+
 export async function listLobbyGames() {
   return invoke("lobby", "/hubs/lobby", "ListGames", [], true);
 }
@@ -344,8 +357,8 @@ export async function leaveLobbyGame(gameId) {
   return invoke("lobby", "/hubs/lobby", "LeaveGame", [gameId], true);
 }
 
-export async function joinGame(gameId) {
-  return invoke("game", "/hubs/game", "joinGame", [{ gameId }], true);
+export async function joinGame({ gameId, playerId, buyIn }) {
+  return invoke("game", "/hubs/game", "joinGame", [{ gameId, playerId, buyIn }], true);
 }
 
 export async function startGame(players) {
@@ -447,6 +460,7 @@ export async function onJoinGame(payload) {
         gameId: payload?.gameId,
         playerId: payload?.playerId,
         request: Number(payload?.request ?? 1),
+        buyIn: payload?.buyIn,
       },
     ],
     true
@@ -493,5 +507,5 @@ export async function tallyHands(payload) {
 }
 
 export async function disconnectSockets() {
-  await Promise.all(["auth", "game", "lobby"].map((key) => stopConnection(key)));
+  await Promise.all(["auth", "game", "lobby", "wallet"].map((key) => stopConnection(key)));
 }

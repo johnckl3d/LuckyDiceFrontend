@@ -1,6 +1,9 @@
 import {
   createLobbyGame,
+  getWalletBalance,
   isSessionExpiredError,
+  topUpWallet,
+  withdrawWallet,
   leaveLobbyGame,
   listLobbyGames,
   pingEngine,
@@ -13,15 +16,33 @@ import {
   hideSeatsFilledPopup,
   readCreateGameForm,
   renderLobbyGames,
+  hideTopUpPopup,
+  hideTopUpWaiting,
+  readTopUpAmount,
+  readWalletAction,
+  renderWalletBalance,
   setCreateBusy,
+  setTopUpBusy,
+  showTopUpError,
+  showTopUpPopup,
+  showTopUpWaiting,
   setReadyBusy,
   showLobby,
   showLobbyError,
   showSeatsFilledPopup,
   showReadyWaiting,
+  whenTopUpHidden,
+  whenTopUpWaitingHidden,
+  whenTopUpWaitingShown,
 } from "../views/lobbyView.js";
-import { setEngineStatus } from "../views/gameView.js";
-import { enterGame, leaveGame, applyOpeningRolled } from "./gameController.js";
+import { setEngineStatus, setWalletDisplay } from "../views/gameView.js";
+import {
+  enterGame,
+  leaveGame,
+  applyOpeningRolled,
+  keepPendingJoin,
+  resumePendingJoin,
+} from "./gameController.js";
 import {
   enterLeaderboard,
   initLeaderboardController,
@@ -32,11 +53,79 @@ const POLL_MS = 8000;
 let pollId = null;
 let bound = false;
 let lastReadyGameId = "";
+let listedGames = [];
+
+function readBalance(payload) {
+  const balance = payload?.balance ?? payload?.Balance;
+  return balance == null ? null : balance;
+}
+
+async function refreshBalance() {
+  try {
+    const payload = await getWalletBalance();
+    renderWalletBalance(readBalance(payload));
+  } catch (error) {
+    if (isSessionExpiredError(error)) {
+      return;
+    }
+    renderWalletBalance(null);
+  }
+}
+
+async function handleTopUp() {
+  const amount = readTopUpAmount();
+  const withdraw = readWalletAction() === "withdraw";
+  if (!Number.isInteger(amount) || amount < 10 || amount > 1000) {
+    showTopUpError("Enter an amount from RM 10 to RM 1,000.");
+    return;
+  }
+
+  setTopUpBusy(true);
+  showTopUpError("");
+  if (!withdraw) {
+    keepPendingJoin();
+    showTopUpWaiting();
+    await whenTopUpHidden();
+    await whenTopUpWaitingShown();
+  }
+  try {
+    const payload = withdraw ? await withdrawWallet(amount) : await topUpWallet(amount);
+    const balance = readBalance(payload);
+    renderWalletBalance(balance);
+    if (balance != null) {
+      setWalletDisplay(balance);
+    }
+    const hidden = whenTopUpHidden();
+    const waitingHidden = whenTopUpWaitingHidden();
+    hideTopUpPopup();
+    hideTopUpWaiting();
+    await hidden;
+    await waitingHidden;
+    if (!withdraw) {
+      await resumePendingJoin();
+    }
+  } catch (error) {
+    hideTopUpWaiting();
+    if (isSessionExpiredError(error)) {
+      return;
+    }
+    const message =
+      error.message === "Failed to fetch" ? "Could not reach the game engine." : error.message;
+    if (!withdraw) {
+      showTopUpPopup(message);
+    } else {
+      showTopUpError(message);
+    }
+  } finally {
+    setTopUpBusy(false);
+  }
+}
 
 async function refreshGames({ keepError = false } = {}) {
   try {
     const payload = await listLobbyGames();
-    renderLobbyGames(payload.games ?? []);
+    listedGames = payload.games ?? [];
+    renderLobbyGames(listedGames);
     if (!keepError) {
       showLobbyError("");
     }
@@ -44,6 +133,7 @@ async function refreshGames({ keepError = false } = {}) {
     if (keepError || isSessionExpiredError(error)) {
       return;
     }
+    listedGames = [];
     renderLobbyGames([]);
     showLobbyError(
       error.message === "Failed to fetch" ? "Could not reach the game engine." : error.message
@@ -109,13 +199,33 @@ function handleLobbyUpdated() {
 
 const PLAYER_RESPONSE_START = 1;
 
+function readAmount(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function buyInForReady(game) {
+  const direct = readAmount(game?.buyIn ?? game?.BuyIn ?? game?.stake ?? game?.Stake);
+  if (direct != null) {
+    return direct;
+  }
+  const gameId = game?.gameId ?? game?.GameId ?? "";
+  const listed = listedGames.find(
+    (item) => String(item?.gameId ?? item?.GameId ?? "") === String(gameId)
+  );
+  return readAmount(listed?.buyIn ?? listed?.BuyIn ?? listed?.stake ?? listed?.Stake);
+}
+
 function handleGameReady(game) {
   const gameId = game?.gameId ?? game?.GameId ?? "";
   if (gameId && gameId === lastReadyGameId) {
     return;
   }
   lastReadyGameId = gameId;
-  showSeatsFilledPopup();
+  showSeatsFilledPopup(buyInForReady(game));
   refreshGames({ keepError: true });
 }
 
@@ -169,19 +279,47 @@ function readGameId(value) {
   return String(value).trim();
 }
 
+function readTableStarted(payload, gameId) {
+  let data = payload;
+  if (typeof data === "string") {
+    const text = data.trim();
+    if (text.startsWith("{") || text.startsWith("[")) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = null;
+      }
+    } else {
+      data = null;
+    }
+  }
+  if (Array.isArray(data)) {
+    data = data[0];
+  }
+  if (data && typeof data === "object") {
+    return { ...data, gameId };
+  }
+  return { gameId };
+}
+
+export function closeLobbyForGame() {
+  stopPolling();
+  hideSeatsFilledPopup();
+  hideLobby();
+  leaveLeaderboard();
+}
+
 async function handleTableStarted(payload) {
   const gameId = readGameId(payload) || lastReadyGameId;
   hideSeatsFilledPopup();
   lastReadyGameId = "";
-  stopPolling();
-  hideLobby();
   leaveLeaderboard();
   if (!gameId) {
     showLobby();
     showLobbyError("Table started, but no gameId was provided.");
     return;
   }
-  await enterGame(typeof payload === "object" && payload ? { ...payload, gameId } : { gameId });
+  await enterGame(readTableStarted(payload, gameId));
 }
 
 async function handleReadyCancel() {
@@ -245,6 +383,7 @@ export function initLobbyController() {
     onBackToLobby: enterLobby,
     onReadyCancel: handleReadyCancel,
     onReadyStart: handleReadyStart,
+    onTopUp: handleTopUp,
   });
   bound = true;
 }
@@ -255,6 +394,7 @@ export function enterLobby() {
   showLobby();
   showEngineStatus();
   listenForLobbyNotifications();
+  refreshBalance();
   refreshGames();
   startPolling();
 }
@@ -262,6 +402,8 @@ export function enterLobby() {
 export function leaveLobby() {
   stopPolling();
   hideSeatsFilledPopup();
+  hideTopUpPopup();
+  hideTopUpWaiting();
   hideLobby();
   leaveLeaderboard();
   leaveGame();

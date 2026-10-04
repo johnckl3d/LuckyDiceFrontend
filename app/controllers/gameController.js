@@ -1,5 +1,6 @@
 import {
   arrangeOpening,
+  getWalletBalance,
   isSessionExpiredError,
   joinGame,
   leaveGame as invokeLeaveGame,
@@ -52,16 +53,24 @@ import {
   setEngineStatus,
   setRankingNote,
   setStakeDisplay,
+  setWalletDisplay,
   setOpeningTallyOkBusy,
   setStatus,
   setTimerDisplay,
   showGameScreen,
   showResult,
 } from "../views/gameView.js";
+import { showLobby, showLobbyError, showTopUpPopup } from "../views/lobbyView.js";
+
+const INSUFFICIENT_WALLET_CODE = 2;
 
 let timerId = null;
 let gameReady = false;
 let gamePhase = null;
+let pendingJoin = null;
+let joinInFlight = false;
+let retainPendingJoin = false;
+let topUpHideHandler = null;
 
 function setGamePhase(eventName) {
   gamePhase = eventName;
@@ -569,6 +578,18 @@ async function newGame() {
   await startTurn(state.currentPlayerId);
 }
 
+async function refreshGameWallet() {
+  try {
+    const payload = await getWalletBalance();
+    const balance = payload?.balance ?? payload?.Balance;
+    setWalletDisplay(balance == null ? null : balance);
+  } catch (error) {
+    if (!isSessionExpiredError(error)) {
+      setWalletDisplay(null);
+    }
+  }
+}
+
 async function showEngineStatus() {
   const status = await pingEngine();
   if (status.ok) {
@@ -587,6 +608,7 @@ async function handleReroll() {
 }
 
 export function leaveGame() {
+  pendingJoin = null;
   clearTimer();
   hideResult();
   state.awaitingOpeningTallyAck = false;
@@ -645,7 +667,6 @@ function initializeGameView(started) {
   renderPlayers();
   renderOpponentBoards();
   renderBoard();
-  showGameScreen(true);
   setStatus("Game started. Waiting for opening roll…");
 }
 
@@ -1275,12 +1296,24 @@ async function leaveTable() {
 }
 
 async function joinResultGame() {
+  const payload = {
+    gameId: state.gameId,
+    playerId: localPlayerId(),
+    request: 1,
+    buyIn: state.stake,
+  };
   try {
-    await onJoinGame({
-      gameId: state.gameId,
-      playerId: localPlayerId(),
-      request: 1,
-    });
+    const result = await onJoinGame(payload);
+    if (readResultCode(result) === INSUFFICIENT_WALLET_CODE) {
+      pendingJoin = {
+        started: { gameId: state.gameId, buyIn: state.stake },
+        payload,
+        mode: "again",
+      };
+      promptWalletTopUp(payload.buyIn, { stayInGame: true });
+      return;
+    }
+    pendingJoin = null;
     setStatus("Joining the next game…");
   } catch (error) {
     if (!isSessionExpiredError(error)) {
@@ -1358,6 +1391,119 @@ async function listenForGameNotifications() {
   }
 }
 
+function readResultCode(result) {
+  const value = Number(result?.code ?? result?.Code);
+  return Number.isFinite(value) ? value : null;
+}
+
+function joinArgs(started, gameId) {
+  return {
+    gameId,
+    playerId: localPlayerId(),
+    buyIn: started?.buyIn ?? started?.BuyIn ?? started?.stake ?? started?.Stake ?? state.stake,
+  };
+}
+
+function topUpMessage(buyIn) {
+  const amount = Number(buyIn);
+  if (Number.isFinite(amount)) {
+    return `Not enough balance for the RM ${amount} buy-in. Top up your wallet to join the game.`;
+  }
+  return "Not enough balance to buy in. Top up your wallet to join the game.";
+}
+
+function watchTopUpDismiss() {
+  const modal = document.getElementById("wallet-topup-modal");
+  if (!modal) {
+    return;
+  }
+  if (topUpHideHandler) {
+    modal.removeEventListener("hidden.bs.modal", topUpHideHandler);
+  }
+  topUpHideHandler = () => {
+    if (!retainPendingJoin) {
+      pendingJoin = null;
+    }
+    retainPendingJoin = false;
+  };
+  modal.addEventListener("hidden.bs.modal", topUpHideHandler);
+}
+
+export function keepPendingJoin() {
+  retainPendingJoin = true;
+}
+
+function promptWalletTopUp(buyIn, { stayInGame = false } = {}) {
+  const message = topUpMessage(buyIn);
+  const ready = document.getElementById("lobby-ready-modal");
+  if (!stayInGame) {
+    showLobby();
+    showGameScreen(false);
+    showLobbyError(message);
+  }
+  watchTopUpDismiss();
+  const open = () => showTopUpPopup(message);
+  if (ready?.classList.contains("show")) {
+    ready.addEventListener("hidden.bs.modal", open, { once: true });
+    return;
+  }
+  open();
+}
+
+async function presentJoinedGame() {
+  const { closeLobbyForGame } = await import("./lobbyController.js");
+  showLobbyError("");
+  closeLobbyForGame();
+  showGameScreen(true);
+  refreshGameWallet();
+  showEngineStatus();
+  setStatus("Game started. Waiting for opening roll…");
+}
+
+async function joinTable(started, gameId) {
+  const payload = joinArgs(started, gameId);
+  const result = await joinGame(payload);
+  const code = readResultCode(result);
+  if (code === INSUFFICIENT_WALLET_CODE) {
+    pendingJoin = { started: { ...started, gameId }, payload, mode: "join" };
+    promptWalletTopUp(payload.buyIn);
+    return false;
+  }
+  pendingJoin = null;
+  await presentJoinedGame();
+  return true;
+}
+
+export async function resumePendingJoin() {
+  const pending = pendingJoin;
+  if (!pending || joinInFlight) {
+    return;
+  }
+
+  joinInFlight = true;
+  try {
+    if (pending.mode === "again") {
+      const result = await onJoinGame(pending.payload);
+      if (readResultCode(result) === INSUFFICIENT_WALLET_CODE) {
+        promptWalletTopUp(pending.payload.buyIn, { stayInGame: true });
+        return;
+      }
+      pendingJoin = null;
+      setStatus("Joining the next game…");
+      return;
+    }
+    await joinTable(pending.started, pending.payload.gameId);
+  } catch (error) {
+    if (!isSessionExpiredError(error)) {
+      showLobby();
+      showGameScreen(false);
+      showLobbyError(error.message || "Could not join the game.");
+    }
+  } finally {
+    joinInFlight = false;
+  }
+}
+
 export async function enterGame(started) {
   if (!gameReady) {
     bindGameView({
@@ -1373,17 +1519,22 @@ export async function enterGame(started) {
       onLeaveTable: leaveTable,
       onResultNewGame: joinResultGame,
       onNewGame: newGame,
+      onTopUp: () => showTopUpPopup(),
     });
     gameReady = true;
     initResultModal();
   }
 
-  showGameScreen(true);
-  showEngineStatus();
   await listenForGameNotifications();
 
   const gameId = started?.gameId ?? started?.GameId;
   if (!gameId) {
+    pendingJoin = null;
+    const { closeLobbyForGame } = await import("./lobbyController.js");
+    closeLobbyForGame();
+    showGameScreen(true);
+    refreshGameWallet();
+    showEngineStatus();
     if (started == null) {
       newGame();
     } else {
@@ -1392,13 +1543,26 @@ export async function enterGame(started) {
     return;
   }
 
+  if (pendingJoin) {
+    promptWalletTopUp(pendingJoin.payload.buyIn);
+    return;
+  }
+
+  if (joinInFlight) {
+    return;
+  }
+
   applyStartedGame({ ...started, gameId });
+  joinInFlight = true;
   try {
-    await joinGame(gameId);
-    setStatus("Game started. Waiting for opening roll…");
+    await joinTable({ ...started, gameId }, gameId);
   } catch (error) {
     if (!isSessionExpiredError(error)) {
-      setStatus(error.message || "Could not join the game.");
+      showLobby();
+      showGameScreen(false);
+      showLobbyError(error.message || "Could not join the game.");
     }
+  } finally {
+    joinInFlight = false;
   }
 }

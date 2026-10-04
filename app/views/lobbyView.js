@@ -2,6 +2,16 @@ import { normalizeLobbyGame, playerNames, seatsFilled, statusLabel } from "../mo
 
 const els = {
   screen: document.getElementById("lobby-screen"),
+  walletBalance: document.getElementById("wallet-balance"),
+  topUpBtn: document.getElementById("topup-btn"),
+  topUpModal: document.getElementById("wallet-topup-modal"),
+  topUpTitle: document.getElementById("wallet-topup-title"),
+  topUpForm: document.getElementById("wallet-topup-form"),
+  walletAction: document.getElementById("wallet-action"),
+  topUpAmount: document.getElementById("topup-amount"),
+  topUpError: document.getElementById("topup-error"),
+  topUpSubmitBtn: document.getElementById("topup-submit-btn"),
+  topUpWaitingModal: document.getElementById("topup-waiting-modal"),
   form: document.getElementById("create-game-form"),
   playerCount: document.getElementById("create-player-count"),
   turnTime: document.getElementById("create-turn-time"),
@@ -23,12 +33,40 @@ const els = {
 
 const READY_COPY = {
   title: "Game ready",
-  body: "All seats are filled. Start the game, or cancel to leave your seat.",
+  body: "All seats are filled. Buy in to start, or cancel to leave your seat.",
   waitingTitle: "Waiting",
   waitingBody: "Waiting other players...",
 };
 
+function readyBody(buyIn) {
+  if (buyIn == null || buyIn === "") {
+    return READY_COPY.body;
+  }
+  const amount = Number(buyIn);
+  const label = Number.isFinite(amount) ? String(amount) : String(buyIn);
+  return `All seats are filled. The buy-in is RM ${label}. Buy in to start, or cancel to leave your seat.`;
+}
+
 let readyModal = null;
+let topUpModal = null;
+let topUpWaitingModal = null;
+
+function walletTopUpModal() {
+  if (!topUpModal && els.topUpModal) {
+    topUpModal = new bootstrap.Modal(els.topUpModal);
+  }
+  return topUpModal;
+}
+
+function walletTopUpWaitingModal() {
+  if (!topUpWaitingModal && els.topUpWaitingModal) {
+    topUpWaitingModal = new bootstrap.Modal(els.topUpWaitingModal, {
+      backdrop: "static",
+      keyboard: false,
+    });
+  }
+  return topUpWaitingModal;
+}
 
 function lobbyReadyModal() {
   if (!readyModal && els.readyModal) {
@@ -45,6 +83,107 @@ export function showLobby() {
 export function hideLobby() {
   els.screen.hidden = true;
   els.lobbyNav.hidden = false;
+}
+
+export function renderWalletBalance(balance) {
+  els.walletBalance.textContent =
+    balance == null || balance === "" ? "—" : String(balance);
+}
+
+function applyWalletAction() {
+  const withdraw = readWalletAction() === "withdraw";
+  els.topUpTitle.textContent = withdraw ? "Withdraw" : "Top up wallet";
+  els.topUpSubmitBtn.textContent = withdraw ? "Withdraw" : "Top up";
+}
+
+export function readWalletAction() {
+  return els.walletAction.value === "withdraw" ? "withdraw" : "topup";
+}
+
+export function showTopUpPopup(message = "") {
+  if (els.topUpModal && els.topUpModal.parentElement !== document.body) {
+    document.body.appendChild(els.topUpModal);
+  }
+  showTopUpError(message);
+  setTopUpBusy(false);
+  els.walletAction.value = "topup";
+  applyWalletAction();
+  els.topUpModal.addEventListener(
+    "shown.bs.modal",
+    () => {
+      els.topUpAmount.focus();
+    },
+    { once: true }
+  );
+  walletTopUpModal()?.show();
+}
+
+export function hideTopUpPopup() {
+  walletTopUpModal()?.hide();
+  setTopUpBusy(false);
+  showTopUpError("");
+}
+
+export function showTopUpWaiting() {
+  if (els.topUpWaitingModal && els.topUpWaitingModal.parentElement !== document.body) {
+    document.body.appendChild(els.topUpWaitingModal);
+  }
+  const open = () => walletTopUpWaitingModal()?.show();
+  if (els.topUpModal?.classList.contains("show")) {
+    els.topUpModal.addEventListener("hidden.bs.modal", open, { once: true });
+    walletTopUpModal()?.hide();
+    return;
+  }
+  open();
+}
+
+export function hideTopUpWaiting() {
+  walletTopUpWaitingModal()?.hide();
+}
+
+export function whenTopUpWaitingHidden() {
+  const modal = els.topUpWaitingModal;
+  if (!modal || !modal.classList.contains("show")) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    modal.addEventListener("hidden.bs.modal", () => resolve(), { once: true });
+  });
+}
+
+export function whenTopUpWaitingShown() {
+  const modal = els.topUpWaitingModal;
+  if (!modal || modal.classList.contains("show")) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    modal.addEventListener("shown.bs.modal", () => resolve(), { once: true });
+  });
+}
+
+export function whenTopUpHidden() {
+  const modal = els.topUpModal;
+  if (!modal || !modal.classList.contains("show")) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    modal.addEventListener("hidden.bs.modal", () => resolve(), { once: true });
+  });
+}
+
+export function readTopUpAmount() {
+  return Number(els.topUpAmount.value);
+}
+
+export function showTopUpError(message) {
+  els.topUpError.textContent = message;
+  els.topUpError.classList.toggle("d-none", !message);
+}
+
+export function setTopUpBusy(busy) {
+  els.topUpSubmitBtn.disabled = busy;
+  els.topUpAmount.disabled = busy;
+  els.walletAction.disabled = busy;
 }
 
 export function showLobbyError(message) {
@@ -103,12 +242,16 @@ function resetReadyPopup() {
   }
   if (els.readyStartBtn) {
     els.readyStartBtn.hidden = false;
+    els.readyStartBtn.textContent = "Buy in";
   }
   setReadyBusy(false);
 }
 
-export function showSeatsFilledPopup() {
+export function showSeatsFilledPopup(buyIn) {
   resetReadyPopup();
+  if (els.readyBody) {
+    els.readyBody.textContent = readyBody(buyIn);
+  }
   lobbyReadyModal()?.show();
 }
 
@@ -150,10 +293,20 @@ export function bindLobbyView({
   onBackToLobby,
   onReadyCancel,
   onReadyStart,
+  onTopUp,
 }) {
   els.form.addEventListener("submit", (event) => {
     event.preventDefault();
     onCreate();
+  });
+  els.topUpBtn.addEventListener("click", () => showTopUpPopup());
+  els.walletAction.addEventListener("change", () => {
+    showTopUpError("");
+    applyWalletAction();
+  });
+  els.topUpForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    onTopUp();
   });
   els.refreshBtn.addEventListener("click", () => onRefresh());
   els.practiceBtn.addEventListener("click", () => onPracticeTable());

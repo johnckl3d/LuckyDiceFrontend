@@ -1,2 +1,3 @@
 # Logs
 logs/
+.cursor/debug-*.log
