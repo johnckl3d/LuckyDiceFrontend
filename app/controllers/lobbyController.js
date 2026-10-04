@@ -22,6 +22,11 @@ import {
 } from "../views/lobbyView.js";
 import { setEngineStatus } from "../views/gameView.js";
 import { enterGame, leaveGame, applyOpeningRolled } from "./gameController.js";
+import {
+  enterLeaderboard,
+  initLeaderboardController,
+  leaveLeaderboard,
+} from "./leaderboardController.js";
 
 const POLL_MS = 8000;
 let pollId = null;
@@ -88,7 +93,14 @@ function stopPolling() {
 function handlePracticeTable() {
   stopPolling();
   hideLobby();
+  leaveLeaderboard();
   enterGame();
+}
+
+function handleOpenLeaderboard() {
+  stopPolling();
+  hideLobby();
+  enterLeaderboard();
 }
 
 function handleLobbyUpdated() {
@@ -163,6 +175,7 @@ async function handleTableStarted(payload) {
   lastReadyGameId = "";
   stopPolling();
   hideLobby();
+  leaveLeaderboard();
   if (!gameId) {
     showLobby();
     showLobbyError("Table started, but no gameId was provided.");
@@ -223,10 +236,12 @@ export function initLobbyController() {
   if (bound) {
     return;
   }
+  initLeaderboardController();
   bindLobbyView({
     onCreate: handleCreate,
     onRefresh: refreshGames,
     onPracticeTable: handlePracticeTable,
+    onLeaderboard: handleOpenLeaderboard,
     onBackToLobby: enterLobby,
     onReadyCancel: handleReadyCancel,
     onReadyStart: handleReadyStart,
@@ -236,6 +251,7 @@ export function initLobbyController() {
 
 export function enterLobby() {
   leaveGame();
+  leaveLeaderboard();
   showLobby();
   showEngineStatus();
   listenForLobbyNotifications();
@@ -247,5 +263,6 @@ export function leaveLobby() {
   stopPolling();
   hideSeatsFilledPopup();
   hideLobby();
+  leaveLeaderboard();
   leaveGame();
 }

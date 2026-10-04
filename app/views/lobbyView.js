@@ -10,6 +10,7 @@ const els = {
   createBtn: document.getElementById("create-game-btn"),
   refreshBtn: document.getElementById("refresh-lobby-btn"),
   practiceBtn: document.getElementById("practice-table-btn"),
+  leaderboardBtn: document.getElementById("leaderboard-btn"),
   gamesBody: document.getElementById("lobby-games-body"),
   lobbyNav: document.getElementById("lobby-nav-btn"),
   readyModal: document.getElementById("lobby-ready-modal"),
@@ -145,6 +146,7 @@ export function bindLobbyView({
   onCreate,
   onRefresh,
   onPracticeTable,
+  onLeaderboard,
   onBackToLobby,
   onReadyCancel,
   onReadyStart,
@@ -155,6 +157,7 @@ export function bindLobbyView({
   });
   els.refreshBtn.addEventListener("click", () => onRefresh());
   els.practiceBtn.addEventListener("click", () => onPracticeTable());
+  els.leaderboardBtn.addEventListener("click", () => onLeaderboard());
   els.lobbyNav.addEventListener("click", () => onBackToLobby());
   els.readyCancelBtn?.addEventListener("click", () => onReadyCancel?.());
   els.readyCloseBtn?.addEventListener("click", () => onReadyCancel?.());

@@ -45,6 +45,7 @@
               Log in
             </button>
           </form>
+          <a class="btn btn-outline-dark w-100 mt-3" href="register.html">Register</a>
         </div>
       </div>
     </div>
@@ -108,7 +109,10 @@
                 </form>
               </div>
             </div>
-            <button type="button" class="btn btn-outline-secondary w-100 mt-3" id="practice-table-btn">
+            <button type="button" class="btn btn-outline-dark w-100 mt-3" id="leaderboard-btn">
+              Leaderboard
+            </button>
+            <button type="button" class="btn btn-outline-secondary w-100 mt-2" id="practice-table-btn">
               Practice table
             </button>
           </div>
@@ -164,6 +168,39 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div id="leaderboard-screen" hidden>
+      <main class="container py-3 py-md-4">
+        <div class="card shadow-sm">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            Leaderboard
+            <span class="text-muted small" id="leaderboard-summary"></span>
+          </div>
+          <div class="alert alert-danger d-none m-3 mb-0" id="leaderboard-error" role="alert"></div>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0" id="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Player</th>
+                  <th class="text-end">Wins</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-body">
+                <tr>
+                  <td colspan="3" class="text-muted">Loading leaderboard…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-footer">
+            <nav aria-label="Leaderboard pages">
+              <ul class="pagination pagination-sm mb-0" id="leaderboard-pages"></ul>
+            </nav>
+          </div>
+        </div>
+      </main>
     </div>
 
     <div id="game-screen" hidden>

@@ -193,6 +193,10 @@ export async function login(userId, password) {
   return getSession();
 }
 
+export async function register(userId, password, emailAddress) {
+  return invoke("auth", "/hubs/auth", "Register", [{ userId, password, emailAddress }]);
+}
+
 export async function pingEngine() {
   try {
     await ensureConnection("auth", "/hubs/auth");
@@ -322,6 +326,10 @@ export async function subscribeGameNotifications(handlers) {
 
 export async function listLobbyGames() {
   return invoke("lobby", "/hubs/lobby", "ListGames", [], true);
+}
+
+export async function getLeaderboard(page) {
+  return invoke("lobby", "/hubs/lobby", "GetLeaderboard", [page], true);
 }
 
 export async function createLobbyGame(payload) {
