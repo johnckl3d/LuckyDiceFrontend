@@ -261,6 +261,8 @@ function bindGameNotificationHandlers(connection) {
   connection.off("OnWaitingPlayers");
   connection.off("gameDetails");
   connection.off("GameDetails");
+  connection.off("gameDetailsEvent");
+  connection.off("GameDetailsEvent");
   if (gameNotificationHandlers?.onOpeningRolled) {
     connection.on("openingRolled", gameNotificationHandlers.onOpeningRolled);
     connection.on("OpeningRolled", gameNotificationHandlers.onOpeningRolled);
@@ -310,6 +312,8 @@ function bindGameNotificationHandlers(connection) {
   if (gameNotificationHandlers?.onGameDetails) {
     connection.on("gameDetails", gameNotificationHandlers.onGameDetails);
     connection.on("GameDetails", gameNotificationHandlers.onGameDetails);
+    connection.on("gameDetailsEvent", gameNotificationHandlers.onGameDetails);
+    connection.on("GameDetailsEvent", gameNotificationHandlers.onGameDetails);
   }
 }
 
@@ -362,7 +366,7 @@ export async function joinGame({ gameId, playerId, buyIn }) {
 }
 
 export async function startGame(players) {
-  return invoke("game", "/hubs/game", "Start", [{ players }]);
+  return null;
 }
 
 export async function rollDice(payload) {

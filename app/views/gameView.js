@@ -11,6 +11,7 @@ import {
 
 let resultModal = null;
 let handlers = {};
+let resultDismissOnly = false;
 
 const els = {
   engineStatus: document.getElementById("engine-status"),
@@ -49,6 +50,7 @@ const els = {
   rankingNote: document.getElementById("ranking-note"),
   timerLabel: document.getElementById("timer-label"),
   timerBar: document.getElementById("timer-bar"),
+  gameIdLabel: document.getElementById("game-id-label"),
   stakeLabel: document.getElementById("stake-label"),
   walletLabel: document.getElementById("game-wallet-balance"),
   topUpBtn: document.getElementById("game-topup-btn"),
@@ -183,7 +185,13 @@ export function bindGameView(nextHandlers) {
     handlers.onOpeningTallyOk?.();
   });
   els.newGameBtn.addEventListener("click", () => handlers.onNewGame?.());
-  els.resultNewGameBtn.addEventListener("click", () => handlers.onNewGame?.());
+  els.resultNewGameBtn.addEventListener("click", () => {
+    if (resultDismissOnly) {
+      hideResult();
+      return;
+    }
+    handlers.onResultNewGame?.();
+  });
   els.topUpBtn?.addEventListener("click", () => handlers.onTopUp?.());
   els.seatCount.addEventListener("change", () => handlers.onNewGame?.());
 
@@ -228,6 +236,13 @@ function formatMoney(value) {
   return Number.isFinite(amount) ? amount.toFixed(2) : String(value);
 }
 
+export function setGameIdDisplay(gameId) {
+  if (!els.gameIdLabel) {
+    return;
+  }
+  els.gameIdLabel.textContent = gameId ? String(gameId) : "—";
+}
+
 export function setStakeDisplay(stake) {
   els.stakeLabel.textContent = formatMoney(stake);
 }
@@ -270,11 +285,23 @@ export function renderPlayers() {
       name.textContent += " (you)";
     }
 
+    const meta = document.createElement("span");
+    meta.className = "d-flex align-items-center gap-2";
+
+    if (player.wallet != null && player.wallet !== "") {
+      const wallet = document.createElement("span");
+      wallet.className = "font-monospace";
+      wallet.dataset.playerWallet = String(player.id);
+      wallet.textContent = formatMoney(player.wallet);
+      meta.appendChild(wallet);
+    }
+
     const badge = document.createElement("span");
     badge.className = player.kind === "ai" ? "badge text-bg-dark" : "badge text-bg-secondary";
     badge.textContent = player.kind === "ai" ? "AI" : "Human";
+    meta.appendChild(badge);
 
-    item.append(name, badge);
+    item.append(name, meta);
     els.playerList.appendChild(item);
   });
   renderOpponentBoards();
@@ -338,6 +365,18 @@ function createOpponentBoard(player) {
   title.className = "opponent-board-name";
   title.textContent = player.name;
   card.appendChild(title);
+
+  const wallet = document.createElement("div");
+  wallet.className = "opponent-board-wallet";
+  wallet.dataset.playerWallet = String(player.id);
+  const walletLabel = document.createElement("span");
+  walletLabel.className = "small text-white-50";
+  walletLabel.textContent = "Wallet";
+  const walletAmount = document.createElement("span");
+  walletAmount.className = "font-monospace ms-1";
+  walletAmount.textContent = formatMoney(player.wallet);
+  wallet.append(walletLabel, walletAmount);
+  card.appendChild(wallet);
 
   [
     { row: 4, label: "set2" },
@@ -619,9 +658,11 @@ export function renderBoard() {
   renderOpeningTallyActions();
 }
 
-export function showResult(title, body) {
+export function showResult(title, body, options = {}) {
   els.resultTitle.textContent = title;
   els.resultBody.textContent = body;
+  resultDismissOnly = Boolean(options.dismissOnly);
+  els.resultNewGameBtn.textContent = options.label ?? (resultDismissOnly ? "Ok" : "New game");
   resultModal.show();
 }
 

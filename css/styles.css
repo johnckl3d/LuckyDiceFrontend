@@ -40,8 +40,14 @@ body {
 }
 
 .player-board-wallet,
+.player-board-game,
 .player-board-stake {
   font-variant-numeric: tabular-nums;
+}
+
+.player-board-game {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .board-row-label {
@@ -256,6 +262,12 @@ body {
 .opponent-board-name {
   color: #fff;
   font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.opponent-board-wallet {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
   margin-bottom: 0.75rem;
 }
 

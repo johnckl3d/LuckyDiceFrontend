@@ -51,6 +51,7 @@ import {
   renderPlayers,
   renderRanking,
   setEngineStatus,
+  setGameIdDisplay,
   setRankingNote,
   setStakeDisplay,
   setWalletDisplay,
@@ -213,7 +214,10 @@ async function handleInstantWin(result) {
   renderBoard();
   setRankingNote("Sequence 1-2-3-4-5 wins the game immediately.");
   setStatus(`Instant win · ${winner.name} · sequence 1-2-3-4-5`);
-  showResult("Instant win", `${winner.name}: sequence 1-2-3-4-5. That wins the game.`);
+  showResult("Instant win", `${winner.name}: sequence 1-2-3-4-5. That wins the game.`, {
+    label: "Ok",
+    dismissOnly: true,
+  });
 }
 
 function diceRowsFromBoard() {
@@ -569,7 +573,12 @@ async function newGame() {
   renderRanking();
 
   const started = await startGame(defaultPlayers(getSeatCount()));
-  state.gameId = started.gameId;
+  if (!started?.gameId) {
+    resetBoard();
+    renderPlayers();
+    setStatus("Waiting for the server to start the table.");
+    return;
+  }
   state.players = started.players;
   state.round = started.round;
   state.currentPlayerId = started.currentPlayerId;
@@ -617,6 +626,7 @@ export function leaveGame() {
   setGamePhase(null);
   state.loserId = null;
   state.winnerId = null;
+  setGameIdDisplay(null);
   renderBoard();
   showGameScreen(false);
 }
@@ -631,7 +641,7 @@ function initializeGameView(started) {
   const preservedTurnTime = sameGame ? state.turnTime : 0;
   const preservedStake = sameGame ? state.stake : null;
   const turnTime = Number(started.turnTime ?? started.TurnTime);
-  const stake = started.stake ?? started.Stake;
+  const stake = started.stake ?? started.Stake ?? started.buyIn ?? started.BuyIn;
 
   clearTimer();
   hideResult();
@@ -654,10 +664,12 @@ function initializeGameView(started) {
   if (gameId) {
     state.gameId = gameId;
   }
+  setGameIdDisplay(state.gameId);
   const rawPlayers = started.players ?? started.Players;
   if (Array.isArray(rawPlayers)) {
     state.players = rawPlayers.map(normalizePlayer);
   }
+  syncPlayerWallets();
   const currentPlayerId = started.currentPlayerId ?? started.CurrentPlayerId;
   if (currentPlayerId != null) {
     state.currentPlayerId = currentPlayerId;
@@ -738,6 +750,156 @@ function normalizeOpeningRolled(payload) {
     .filter((item) => item.playerId && item.values.length);
 }
 
+function walletAmountOf(entry) {
+  if (entry == null || entry === "") {
+    return null;
+  }
+  if (typeof entry !== "object") {
+    return entry;
+  }
+  const amount = pick(entry, [
+    "balance",
+    "Balance",
+    "wallet",
+    "Wallet",
+    "amount",
+    "Amount",
+    "walletAmount",
+    "WalletAmount",
+    "walletBalance",
+    "WalletBalance",
+  ]);
+  return amount == null || amount === "" ? null : amount;
+}
+
+function walletBalanceList(raw, depth = 0) {
+  if (raw == null || depth > 3) {
+    return [];
+  }
+  if (Array.isArray(raw)) {
+    return raw;
+  }
+  if (typeof raw !== "object") {
+    return [];
+  }
+
+  const nested = pick(raw, [
+    "players",
+    "Players",
+    "balances",
+    "Balances",
+    "items",
+    "Items",
+    "wallets",
+    "Wallets",
+    "walletBalance",
+    "WalletBalance",
+    "walletBalances",
+    "WalletBalances",
+  ]);
+  if (nested && nested !== raw) {
+    const list = walletBalanceList(nested, depth + 1);
+    if (list.length) {
+      return list;
+    }
+  }
+
+  const playerId = pick(raw, ["playerId", "PlayerId", "id", "Id", "userId", "UserId"]);
+  if (playerId != null && playerId !== "" && walletAmountOf(raw) != null) {
+    return [raw];
+  }
+
+  return Object.entries(raw).map(([id, value]) => {
+    if (value != null && typeof value === "object") {
+      return {
+        playerId: pick(value, ["playerId", "PlayerId", "id", "Id", "userId", "UserId"]) ?? id,
+        balance: walletAmountOf(value),
+      };
+    }
+    return { playerId: id, balance: value };
+  });
+}
+
+function normalizeWalletBalances(raw) {
+  return walletBalanceList(raw)
+    .map((item) => {
+      const playerId =
+        item && typeof item === "object"
+          ? pick(item, ["playerId", "PlayerId", "id", "Id", "userId", "UserId", "name", "Name"])
+          : null;
+      const balance = walletAmountOf(item);
+      if (playerId == null || playerId === "" || balance == null || balance === "") {
+        return null;
+      }
+      return { playerId, balance };
+    })
+    .filter(Boolean);
+}
+
+let latestWalletBalances = [];
+let latestWalletGameId = null;
+
+function rememberWalletBalances(balances, gameId) {
+  if (gameId && latestWalletGameId && String(gameId) !== String(latestWalletGameId)) {
+    latestWalletBalances = [];
+  }
+  if (gameId) {
+    latestWalletGameId = gameId;
+  }
+  if (!balances.length) {
+    return;
+  }
+  const merged = new Map(latestWalletBalances.map((entry) => [String(entry.playerId), entry]));
+  balances.forEach((entry) => {
+    merged.set(String(entry.playerId), entry);
+  });
+  latestWalletBalances = [...merged.values()];
+  syncPlayerWallets();
+}
+
+function syncPlayerWallets() {
+  if (!latestWalletBalances.length) {
+    return;
+  }
+
+  const selfId = localPlayerId();
+  let touched = false;
+  latestWalletBalances.forEach(({ playerId, balance }) => {
+    const player = state.players.find((item) => playerMatches(item, playerId));
+    if (player) {
+      player.wallet = balance;
+      touched = true;
+    }
+    const isLocal =
+      (selfId && String(selfId) === String(playerId)) || (player && selfId && playerMatches(player, selfId));
+    if (isLocal) {
+      setWalletDisplay(balance);
+    }
+  });
+
+  if (touched) {
+    renderPlayers();
+  }
+}
+
+function applyWalletBalancePayload(data) {
+  const walletPayload = pick(data, [
+    "walletBalance",
+    "WalletBalance",
+    "walletBalances",
+    "WalletBalances",
+    "wallets",
+    "Wallets",
+    "playerWallets",
+    "PlayerWallets",
+    "balances",
+    "Balances",
+  ]);
+  const fromPlayers = normalizeWalletBalances(pick(data, ["players", "Players"]));
+  const fromWallets = normalizeWalletBalances(walletPayload);
+  rememberWalletBalances(fromWallets.length ? fromWallets : fromPlayers, pick(data, ["gameId", "GameId"]));
+}
+
 export function applyGameDetails(payload) {
   const data = parseJsonPayload(payload);
   if (!data || typeof data !== "object") {
@@ -745,11 +907,23 @@ export function applyGameDetails(payload) {
   }
 
   const gameId = pick(data, ["gameId", "GameId"]);
-  if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
-    return;
+  if (gameId) {
+    state.gameId = gameId;
+    setGameIdDisplay(gameId);
   }
 
-  initializeGameView({ ...data, gameId: gameId ?? state.gameId });
+  const turnTime = Number(pick(data, ["turnTime", "TurnTime"]));
+  if (Number.isFinite(turnTime) && turnTime > 0) {
+    state.turnTime = turnTime;
+  }
+
+  const stake = pick(data, ["stake", "Stake"]);
+  if (stake != null) {
+    state.stake = stake;
+    setStakeDisplay(state.stake);
+  }
+
+  applyWalletBalancePayload(data);
 }
 
 function normalizeRowFaces(raw) {
@@ -928,10 +1102,6 @@ export function applyOpeningTally(payload) {
   if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
     return;
   }
-  if (gameId && !state.gameId) {
-    state.gameId = gameId;
-  }
-
   clearTimer();
   setTimerDisplay(null, turnDuration());
   state.selected.clear();
@@ -980,10 +1150,6 @@ export function applyRoundTally(payload) {
   if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
     return;
   }
-  if (gameId && !state.gameId) {
-    state.gameId = gameId;
-  }
-
   clearTimer();
   setTimerDisplay(null, turnDuration());
   state.selected.clear();
@@ -1032,10 +1198,6 @@ export function applyGameOver(payload) {
   if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
     return;
   }
-  if (gameId && !state.gameId) {
-    state.gameId = gameId;
-  }
-
   clearTimer();
   setTimerDisplay(null, turnDuration());
   state.selected.clear();
@@ -1080,6 +1242,7 @@ export function applyWaitingPlayers(payload) {
   const gameId = pick(data, ["gameId", "GameId"]) ?? pick(tally, ["gameId", "GameId"]);
   if (phase === 10 && gameId) {
     state.gameId = gameId;
+    setGameIdDisplay(gameId);
   }
   state.showResultBar = true;
   state.showResultBarActions = true;
@@ -1098,10 +1261,6 @@ export function applyChallenge1Select(payload) {
   if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
     return;
   }
-  if (gameId && !state.gameId) {
-    state.gameId = gameId;
-  }
-
   clearTimer();
   setTimerDisplay(null, turnDuration());
   state.selected.clear();
@@ -1174,10 +1333,6 @@ export function applyChallenge1Reroll1(payload) {
   if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
     return;
   }
-  if (gameId && !state.gameId) {
-    state.gameId = gameId;
-  }
-
   clearTimer();
   setTimerDisplay(null, turnDuration());
   state.selected.clear();
@@ -1296,6 +1451,7 @@ async function leaveTable() {
 }
 
 async function joinResultGame() {
+  hideResult();
   const payload = {
     gameId: state.gameId,
     playerId: localPlayerId(),

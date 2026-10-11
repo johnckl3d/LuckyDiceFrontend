@@ -41,6 +41,16 @@ export function normalizePlayer(player) {
     id: player.id ?? player.playerId ?? player.userId,
     name: player.name ?? player.playerName ?? player.playerId ?? player.id ?? (kind === "ai" ? "AI" : "Player"),
     kind,
+    wallet:
+      player.wallet ??
+      player.Wallet ??
+      player.balance ??
+      player.Balance ??
+      player.walletBalance ??
+      player.WalletBalance ??
+      player.walletAmount ??
+      player.WalletAmount ??
+      null,
   };
 }
 
