@@ -34,12 +34,13 @@ body {
 .dice-race {
   box-sizing: border-box;
   width: min(100%, 390px);
-  min-height: max(844px, calc(100vh - 56px));
+  height: max(844px, calc(100vh - 56px));
   margin: 0 auto;
-  padding: 44px 20px 12px;
+  padding: 6px 12px 2px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
+  overflow: hidden;
 }
 
 .race-header {
@@ -75,7 +76,7 @@ body {
 }
 
 .race-utility {
-  height: 36px;
+  height: 30px;
   padding: 0 12px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.25);
@@ -91,9 +92,9 @@ body {
 .race-utility-block {
   width: 100%;
   justify-content: center;
-  height: 46px;
-  border-radius: 14px;
-  font-size: 16px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -103,6 +104,7 @@ body {
   align-items: center;
   gap: 8px;
   font-size: 12px;
+  line-height: 14px;
 }
 
 .stakes-value {
@@ -112,7 +114,9 @@ body {
 .opponent-boards {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: stretch;
+  width: 100%;
+  gap: 4px;
 }
 
 .opponent-board,
@@ -125,16 +129,18 @@ body {
 }
 
 .opponent-board {
-  padding: 8px 10px;
-  gap: 5px;
+  width: 100%;
+  padding: 4px 6px;
+  gap: 2px;
   background: #2a8cff22;
   border: 1px solid #2a8cff;
 }
 
 .local-card {
+  width: 100%;
   margin-top: auto;
-  padding: 10px;
-  gap: 6px;
+  padding: 6px;
+  gap: 2px;
   background: #ff5a5a22;
   border: 1px solid #ff5a5a;
 }
@@ -187,6 +193,7 @@ body {
 
 .local-card .card-name {
   font-size: 16px;
+  line-height: 20px;
 }
 
 .card-status,
@@ -200,7 +207,8 @@ body {
 
 .local-card .card-status,
 .local-card #turn-status {
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 15px;
 }
 
 .card-pills {
@@ -251,42 +259,49 @@ body {
 .lanes {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .opponent-board .lanes {
-  gap: 5px;
+  gap: 2px;
 }
 
 .lane {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
 }
 
 .lane-label {
-  width: 52px;
+  width: auto;
   flex: none;
-  font-size: 10px;
+  align-self: flex-start;
+  font-size: 12px;
+  line-height: 13px;
   font-weight: 700;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.3px;
+  text-align: left;
   opacity: 0.7;
 }
 
 .opponent-board .lane-label {
-  width: 40px;
-  font-size: 9px;
-  letter-spacing: 0.5px;
+  width: auto;
+  font-size: 11px;
+  line-height: 12px;
+  letter-spacing: 0.3px;
 }
 
 .dice-slots {
   display: flex;
   flex-wrap: nowrap;
   justify-content: flex-start;
-  gap: 8px;
+  width: 100%;
+  gap: 4px;
 }
 
 .opponent-board .dice-slots {
-  gap: 6px;
+  gap: 4px;
 }
 
 .die-slot {
@@ -316,8 +331,15 @@ body {
 
 .die-slot-compact,
 .opponent-board .die-slot {
-  width: 22px;
-  height: 22px;
+  width: 34px;
+  height: 34px;
+  border-radius: 5px;
+}
+
+.local-card .die-slot,
+.local-card .die-slot-compact {
+  width: 48px;
+  height: 48px;
   border-radius: 6px;
 }
 
@@ -374,16 +396,30 @@ body {
 }
 
 .die-compact {
-  width: 22px;
-  height: 22px;
-  padding: 2px;
+  width: 34px;
+  height: 34px;
+  padding: 3px;
   border-radius: 5px;
   cursor: default;
 }
 
-.die-compact .pip {
-  width: 3.5px;
-  height: 3.5px;
+.local-card .die,
+.local-card .die-compact {
+  width: 48px;
+  height: 48px;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.die-compact .pip,
+.opponent-board .pip {
+  width: 6px;
+  height: 6px;
+}
+
+.local-card .pip {
+  width: 9px;
+  height: 9px;
 }
 
 .die[data-value="1"] .pip:nth-child(5),
@@ -445,17 +481,17 @@ body {
 .local-actions {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .race-btn {
   width: 100%;
-  height: 46px;
+  height: 36px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 10px;
   background: #ff5a5a;
   color: #0b1b3f;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 800;
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
 }
@@ -469,7 +505,8 @@ body {
 .waiting-bar-message,
 .challenge-wait-message {
   color: #ffffff;
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 18px;
 }
 
 .acknowledgement-labels,
@@ -483,7 +520,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 4px;
 }
 
 #board-actions-controls.is-submit-end:not([hidden]) {
@@ -508,7 +545,7 @@ body {
 }
 
 .table-tools summary {
-  height: 36px;
+  height: 22px;
   display: flex;
   align-items: center;
   font-size: 12px;
@@ -592,10 +629,3 @@ body {
   display: none !important;
 }
 
-@media (max-width: 360px) {
-  .local-card .die,
-  .local-card .die-slot {
-    width: 32px;
-    height: 32px;
-  }
-}
