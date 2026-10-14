@@ -1,3 +1,4 @@
+import { currency } from "../config.js";
 import {
   canDrag,
   isHumanTurn,
@@ -8,6 +9,27 @@ import {
   playerMatches,
   state,
 } from "../models/gameModel.js";
+
+function applyCurrencyPlaceholders() {
+  const root = document.getElementById("game-screen");
+  if (!root) {
+    return;
+  }
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let node = walker.nextNode();
+  while (node) {
+    if (node.nodeValue.includes("[CURRENCY]")) {
+      nodes.push(node);
+    }
+    node = walker.nextNode();
+  }
+  nodes.forEach((textNode) => {
+    textNode.nodeValue = textNode.nodeValue.replaceAll("[CURRENCY]", currency);
+  });
+}
+
+applyCurrencyPlaceholders();
 
 let resultModal = null;
 let handlers = {};
@@ -220,11 +242,31 @@ export function initResultModal() {
   }
 }
 
-function formatClock(seconds) {
-  const safe = Math.max(0, Math.floor(Number(seconds) || 0));
-  const mins = Math.floor(safe / 60);
-  const secs = safe % 60;
-  return `${mins}:${String(secs).padStart(2, "0")}`;
+function formatTimer(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  const minutes = Math.floor(total / 60);
+  const secs = String(total % 60).padStart(2, "0");
+  return `${minutes}:${secs}`;
+}
+
+function timerPillIsCurrent(pill) {
+  const currentId = state.currentPlayerId;
+  if (currentId == null || currentId === "" || state.phase === "game-over") {
+    return false;
+  }
+  if (pill.closest(".local-card")) {
+    return isLocalPlayer(currentId);
+  }
+  const card = pill.closest("[data-player-id]");
+  if (!card) {
+    return false;
+  }
+  const cardId = card.dataset.playerId;
+  if (String(cardId) === String(currentId)) {
+    return true;
+  }
+  const player = state.players.find((item) => String(item.id) === String(cardId));
+  return Boolean(player && playerMatches(player, currentId));
 }
 
 function paintTimers() {
@@ -234,45 +276,15 @@ function paintTimers() {
     els.timerBar.style.width = idle ? "0%" : `${Math.max(0, (seconds / total) * 100)}%`;
   }
 
+  const label = idle ? "--:--" : formatTimer(seconds);
   document.querySelectorAll("#game-screen .timer-pill").forEach((pill) => {
-    pill.classList.remove("is-active");
+    const active = !idle && timerPillIsCurrent(pill);
+    pill.classList.toggle("is-active", active);
     const value = pill.querySelector(".timer-pill-value");
     if (value) {
-      value.textContent = "--:--";
+      value.textContent = active ? label : "--:--";
     }
   });
-
-  if (idle) {
-    return;
-  }
-
-  const currentId = state.currentPlayerId;
-  let pill = null;
-  if (currentId && !isLocalPlayer(currentId)) {
-    pill = [...document.querySelectorAll(".opponent-board")].find((card) => {
-      if (String(card.dataset.playerId) === String(currentId)) {
-        return true;
-      }
-      const player = state.players.find((item) => String(item.id) === String(card.dataset.playerId));
-      return player ? playerMatches(player, currentId) : false;
-    })?.querySelector(".timer-pill");
-  }
-  if (!pill) {
-    pill = document.getElementById("local-timer-pill");
-  }
-
-  const text = formatClock(seconds);
-  if (pill) {
-    pill.classList.add("is-active");
-    const value = pill.querySelector(".timer-pill-value");
-    if (value) {
-      value.textContent = text;
-    }
-    return;
-  }
-  if (els.timerLabel) {
-    els.timerLabel.textContent = text;
-  }
 }
 
 export function setTimerDisplay(seconds, total) {
@@ -503,7 +515,7 @@ function createOpponentBoard(player, index) {
   walletAmount.dataset.playerWallet = String(player.id);
   walletAmount.textContent = formatMoney(player.wallet);
   const unit = document.createElement("span");
-  unit.textContent = " [CURRENCY]";
+  unit.textContent = ` ${currency}`;
   wallet.append(walletAmount, unit);
 
   const timer = document.createElement("div");

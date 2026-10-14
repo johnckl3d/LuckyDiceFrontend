@@ -236,6 +236,7 @@ body {
 
 .timer-pill {
   border: 1px dashed rgba(255, 255, 255, 0.35);
+  color: #ffffff;
   opacity: 0.5;
 }
 
