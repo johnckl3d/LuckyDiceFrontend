@@ -10,6 +10,10 @@
       integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
       crossorigin="anonymous"
     />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body>
@@ -268,179 +272,167 @@
     </div>
 
     <div id="game-screen" hidden>
-    <main class="container-fluid py-3 py-md-4 px-3 px-md-4">
-      <div class="row g-4">
-        <div class="col-lg-8">
-          <p class="mb-3" id="turn-status">Starting game…</p>
-
-          <div id="opponent-boards" class="opponent-boards mb-3" hidden></div>
-
-          <section class="table-felt rounded-4 p-3 p-md-4" aria-label="Play table">
-            <div class="player-board-header">
-              <div class="player-board-wallet text-white d-flex align-items-center gap-2">
-                <div>
-                  <span class="small text-white-50">Wallet</span>
-                  <span class="font-monospace ms-1" id="game-wallet-balance">—</span>
-                </div>
-                <button type="button" class="btn btn-outline-light btn-sm" id="game-topup-btn">
-                  Top up
-                </button>
-              </div>
-              <div class="player-board-game text-white">
-                <span class="small text-white-50">Game</span>
-                <span class="font-monospace ms-1" id="game-id-label">—</span>
-              </div>
-              <div class="player-board-stake text-white">
-                <span class="small text-white-50">Stake</span>
-                <span class="font-monospace ms-1" id="stake-label">—</span>
-              </div>
-            </div>
-            <div class="board-row board-row-drop mb-3" data-row="4">
-              <div class="board-row-label">set2</div>
-              <div class="dice-slots" id="set2" aria-label="set2"></div>
-            </div>
-
-            <div class="board-row board-row-drop mb-3" data-row="3">
-              <div class="board-row-label">set1</div>
-              <div class="dice-slots" id="set1" aria-label="set1"></div>
-            </div>
-
-            <div class="board-row mb-3" data-row="2">
-              <div class="board-row-label">flux</div>
-              <div class="dice-slots" id="flux" aria-label="flux"></div>
-            </div>
-
-            <div class="board-row board-row-actions" data-row="1">
-              <div class="board-row-label" id="action-bar-label">actionBar</div>
-              <div id="actionBar" class="action-bar" aria-label="actionBar">
-                <div id="challenge-wait-message" class="challenge-wait-message" hidden>
-                  Waiting for other players to roll dice...
-                </div>
-                <div id="opening-tally-actions" class="opening-tally-actions" hidden>
-                  <div class="text-white">
-                    <span class="small text-white-50">Loser</span>
-                    <span class="font-monospace ms-2" id="opening-tally-loser">—</span>
-                  </div>
-                  <button type="button" class="btn btn-warning btn-lg px-4" id="opening-tally-ok-btn">
-                    OK
-                  </button>
-                </div>
-                <div id="board-actions-controls" class="board-actions-controls">
-                  <button type="button" class="btn btn-light btn-lg px-4" id="submit-btn" disabled>
-                    Submit
-                  </button>
-                  <button type="button" class="btn btn-outline-light btn-lg" id="roll-btn" hidden>
-                    Reroll selected
-                  </button>
-                  <div class="timer-block text-white text-end flex-grow-1">
-                    <div class="d-flex justify-content-end align-items-baseline gap-2">
-                      <span class="small text-white-50">Time</span>
-                      <span class="timer-digits font-monospace" id="timer-label">—</span>
-                    </div>
-                    <div class="progress mt-1" style="height: 8px" role="timer" aria-label="Turn timer">
-                      <div class="progress-bar bg-warning" id="timer-bar" style="width: 0%"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div id="rerollActionBar" class="action-bar reroll-action-bar" aria-label="rerollActionBar" hidden>
-                <div id="reroll-slots" class="dice-slots reroll-slots" data-row="1" aria-label="reroll slots"></div>
-                <button type="button" class="btn btn-light btn-lg px-4" id="reroll-submit-btn" disabled>
-                  Submit
-                </button>
-              </div>
-              <div id="acknowledgementActionBar" class="action-bar acknowledgement-action-bar" aria-label="acknowledgementActionBar" hidden>
-                <div class="acknowledgement-labels text-white">
-                  <div>
-                    <span class="small text-white-50">Loser :</span>
-                    <span class="font-monospace ms-2" id="acknowledgement-loser">—</span>
-                  </div>
-                  <div>
-                    <span class="small text-white-50">Winner :</span>
-                    <span class="font-monospace ms-2" id="acknowledgement-winner">—</span>
-                  </div>
-                </div>
-                <button type="button" class="btn btn-warning btn-lg px-4 acknowledgement-ok-btn" id="acknowledgement-ok-btn">
-                  Ok
-                </button>
-              </div>
-              <div id="resultActionBar" class="action-bar result-action-bar" aria-label="resultBar" hidden>
-                <div class="acknowledgement-labels text-white">
-                  <div>
-                    <span class="small text-white-50">Loser :</span>
-                    <span class="font-monospace ms-2" id="result-loser">—</span>
-                  </div>
-                  <div>
-                    <span class="small text-white-50">Winner :</span>
-                    <span class="font-monospace ms-2" id="result-winner">—</span>
-                  </div>
-                </div>
-                <div class="result-bar-actions">
-                  <button type="button" class="btn btn-outline-light btn-lg px-4" id="resultbar-leave-table-btn" hidden>
-                    Leave table
-                  </button>
-                  <button type="button" class="btn btn-warning btn-lg px-4" id="resultbar-new-game-btn" hidden>
-                    New game
-                  </button>
-                </div>
-              </div>
-              <div id="waitingActionBar" class="action-bar waiting-action-bar" aria-label="waitingBar" hidden>
-                <div class="text-white waiting-bar-message" id="waiting-bar-message">
-                  waiting for — to reroll
-                </div>
-              </div>
-            </div>
-          </section>
+    <div class="dice-race">
+      <header class="race-header">
+        <div class="race-title-block">
+          <div class="race-title">Dice Race</div>
+          <div class="race-meta"><span id="player-count-label">—</span> players · Round <span id="round-label">—</span></div>
         </div>
-
-        <div class="col-lg-4">
-          <div class="card shadow-sm">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              Players
-              <label class="small mb-0 d-flex align-items-center gap-2">
-                Seats
-                <select class="form-select form-select-sm" id="seat-count" style="width: auto">
-                  <option value="2" selected>2</option>
-                  <option value="3">3</option>
-                  <option value="4">4</option>
-                  <option value="5">5</option>
-                </select>
-              </label>
-            </div>
-            <ul class="list-group list-group-flush" id="player-list"></ul>
-            <div class="card-footer">
-              <button type="button" class="btn btn-outline-secondary btn-sm w-100" id="new-game-btn">
-                New game
-              </button>
-            </div>
-          </div>
-
-          <div class="card shadow-sm mt-3">
-            <div class="card-header">Ranking</div>
-            <div class="card-body p-0">
-              <table class="table table-sm mb-0" id="ranking-table">
-                <thead>
-                  <tr>
-                    <th>Place</th>
-                    <th>Player</th>
-                    <th>Hand</th>
-                    <th>Dice</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td colspan="4" class="text-muted">No tally yet</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="card-footer text-muted small" id="ranking-note">
-              After everyone submits round 1, the lowest hand rolls in round 2.
-            </div>
-          </div>
+        <div class="race-header-actions">
+          <button type="button" class="race-utility" id="game-rules-btn" aria-label="Game rules">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7v.5"/><path d="M12 17h.01"/></svg>
+            Game rules
+          </button>
+          <button type="button" class="race-utility" id="game-topup-btn" aria-label="Top up">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Top up
+          </button>
         </div>
+      </header>
+
+      <div class="stakes-row">
+        <div><span class="race-dim">Table stakes</span> <span class="stakes-value" id="stake-label">—</span> <span class="stakes-value">[CURRENCY]</span></div>
+        <div class="race-dim">Game ID <span id="game-id-label">—</span></div>
       </div>
-    </main>
+
+      <div id="opponent-boards" class="opponent-boards" hidden></div>
+
+      <section class="local-card" aria-label="Play table">
+        <div class="card-head">
+          <div class="card-identity">
+            <div class="avatar avatar-local" id="local-avatar" aria-hidden="true">Y</div>
+            <div class="card-id-text">
+              <div class="card-name" id="local-player-name">You</div>
+              <div class="card-status" id="turn-status">Starting game…</div>
+            </div>
+          </div>
+          <div class="card-pills">
+            <div class="wallet-pill"><span id="game-wallet-balance">—</span> [CURRENCY]</div>
+            <div class="timer-pill" id="local-timer-pill">
+              <span class="timer-pill-value" id="timer-label">--:--</span>
+            </div>
+          </div>
+        </div>
+        <div id="timer-bar" class="timer-bar" hidden></div>
+
+        <div class="lanes">
+          <div class="lane board-row board-row-drop" data-row="3">
+            <div class="lane-label">KEEP1</div>
+            <div class="dice-slots" id="set1" aria-label="KEEP1"></div>
+          </div>
+          <div class="lane board-row board-row-drop" data-row="4">
+            <div class="lane-label">KEEP2</div>
+            <div class="dice-slots" id="set2" aria-label="KEEP2"></div>
+          </div>
+          <div class="lane board-row" data-row="2">
+            <div class="lane-label">FLUX</div>
+            <div class="dice-slots" id="flux" aria-label="FLUX"></div>
+          </div>
+        </div>
+
+        <div class="local-actions">
+          <div class="race-sr" id="action-bar-label">actionBar</div>
+          <div id="actionBar" class="action-bar" aria-label="actionBar">
+            <div id="challenge-wait-message" class="challenge-wait-message" hidden>
+              Waiting for other players to roll dice...
+            </div>
+            <div id="opening-tally-actions" class="opening-tally-actions" hidden>
+              <div class="ack-line">
+                <span class="race-dim">Loser</span>
+                <span id="opening-tally-loser">—</span>
+              </div>
+              <button type="button" class="race-btn" id="opening-tally-ok-btn">OK</button>
+            </div>
+            <div id="board-actions-controls" class="board-actions-controls">
+              <button type="button" class="race-btn" id="submit-btn" disabled>Submit</button>
+              <button type="button" class="race-btn" id="roll-btn" hidden>Reroll selected</button>
+            </div>
+          </div>
+          <div id="rerollActionBar" class="action-bar reroll-action-bar" aria-label="rerollActionBar" hidden>
+            <div class="lane">
+              <div class="lane-label">REROLL</div>
+              <div id="reroll-slots" class="dice-slots reroll-slots" data-row="1" aria-label="REROLL"></div>
+            </div>
+            <button type="button" class="race-btn" id="reroll-submit-btn" disabled>Reroll 0 dice</button>
+          </div>
+          <div id="acknowledgementActionBar" class="action-bar acknowledgement-action-bar" aria-label="acknowledgementActionBar" hidden>
+            <div class="acknowledgement-labels">
+              <div class="ack-line">
+                <span class="race-dim">Loser :</span>
+                <span id="acknowledgement-loser">—</span>
+              </div>
+              <div class="ack-line">
+                <span class="race-dim">Winner :</span>
+                <span id="acknowledgement-winner">—</span>
+              </div>
+            </div>
+            <button type="button" class="race-btn acknowledgement-ok-btn" id="acknowledgement-ok-btn">Ok</button>
+          </div>
+          <div id="resultActionBar" class="action-bar result-action-bar" aria-label="resultBar" hidden>
+            <div class="acknowledgement-labels">
+              <div class="ack-line">
+                <span class="race-dim">Loser :</span>
+                <span id="result-loser">—</span>
+              </div>
+              <div class="ack-line">
+                <span class="race-dim">Winner :</span>
+                <span id="result-winner">—</span>
+              </div>
+            </div>
+            <div class="result-bar-actions">
+              <button type="button" class="race-utility race-utility-block" id="resultbar-leave-table-btn" hidden>
+                Leave table
+              </button>
+              <button type="button" class="race-btn" id="resultbar-new-game-btn" hidden>New game</button>
+            </div>
+          </div>
+          <div id="waitingActionBar" class="action-bar waiting-action-bar" aria-label="waitingBar" hidden>
+            <div class="waiting-bar-message" id="waiting-bar-message">waiting for — to reroll</div>
+          </div>
+        </div>
+      </section>
+
+      <details class="table-tools">
+        <summary>Table</summary>
+        <div class="tools-card">
+          <div class="tools-head">
+            <span>Players</span>
+            <label class="seat-label">
+              Seats
+              <select id="seat-count">
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </label>
+          </div>
+          <ul class="list-group list-group-flush" id="player-list"></ul>
+          <button type="button" class="race-utility race-utility-block" id="new-game-btn">New game</button>
+        </div>
+        <div class="tools-card">
+          <div class="tools-head">Ranking</div>
+          <table class="ranking-table" id="ranking-table">
+            <thead>
+              <tr>
+                <th>Place</th>
+                <th>Player</th>
+                <th>Hand</th>
+                <th>Dice</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="4" class="race-dim">No tally yet</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="ranking-note" id="ranking-note">
+            After everyone submits round 1, the lowest hand rolls in round 2.
+          </div>
+        </div>
+      </details>
+    </div>
 
     <div class="modal fade" id="result-modal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">

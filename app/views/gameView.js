@@ -12,6 +12,9 @@ import {
 let resultModal = null;
 let handlers = {};
 let resultDismissOnly = false;
+let lastTimer = { seconds: null, total: 0 };
+
+const OPPONENT_COLORS = ["#2A8CFF", "#FFC400", "#3CDC8C"];
 
 const els = {
   engineStatus: document.getElementById("engine-status"),
@@ -66,7 +69,7 @@ function createDie(index, value, options) {
   button.draggable = Boolean(options.draggable);
   button.dataset.index = String(index);
   button.dataset.value = String(value);
-  button.setAttribute("aria-label", `Die ${index + 1}, ${value}`);
+  button.setAttribute("aria-label", `Die showing ${value}.`);
   button.disabled = options.interactive === false;
 
   if (options.selected) {
@@ -217,15 +220,64 @@ export function initResultModal() {
   }
 }
 
-export function setTimerDisplay(seconds, total) {
-  if (seconds === null) {
-    els.timerLabel.textContent = "—";
-    els.timerBar.style.width = "0%";
+function formatClock(seconds) {
+  const safe = Math.max(0, Math.floor(Number(seconds) || 0));
+  const mins = Math.floor(safe / 60);
+  const secs = safe % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
+function paintTimers() {
+  const { seconds, total } = lastTimer;
+  const idle = seconds === null || seconds === undefined;
+  if (els.timerBar) {
+    els.timerBar.style.width = idle ? "0%" : `${Math.max(0, (seconds / total) * 100)}%`;
+  }
+
+  document.querySelectorAll("#game-screen .timer-pill").forEach((pill) => {
+    pill.classList.remove("is-active");
+    const value = pill.querySelector(".timer-pill-value");
+    if (value) {
+      value.textContent = "--:--";
+    }
+  });
+
+  if (idle) {
     return;
   }
 
-  els.timerLabel.textContent = `${seconds}s`;
-  els.timerBar.style.width = `${Math.max(0, (seconds / total) * 100)}%`;
+  const currentId = state.currentPlayerId;
+  let pill = null;
+  if (currentId && !isLocalPlayer(currentId)) {
+    pill = [...document.querySelectorAll(".opponent-board")].find((card) => {
+      if (String(card.dataset.playerId) === String(currentId)) {
+        return true;
+      }
+      const player = state.players.find((item) => String(item.id) === String(card.dataset.playerId));
+      return player ? playerMatches(player, currentId) : false;
+    })?.querySelector(".timer-pill");
+  }
+  if (!pill) {
+    pill = document.getElementById("local-timer-pill");
+  }
+
+  const text = formatClock(seconds);
+  if (pill) {
+    pill.classList.add("is-active");
+    const value = pill.querySelector(".timer-pill-value");
+    if (value) {
+      value.textContent = text;
+    }
+    return;
+  }
+  if (els.timerLabel) {
+    els.timerLabel.textContent = text;
+  }
+}
+
+export function setTimerDisplay(seconds, total) {
+  lastTimer = { seconds, total };
+  paintTimers();
 }
 
 function formatMoney(value) {
@@ -233,7 +285,10 @@ function formatMoney(value) {
     return "—";
   }
   const amount = Number(value);
-  return Number.isFinite(amount) ? amount.toFixed(2) : String(value);
+  if (!Number.isFinite(amount)) {
+    return String(value);
+  }
+  return amount.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
 }
 
 export function setGameIdDisplay(gameId) {
@@ -271,6 +326,7 @@ export function getSeatCount() {
 }
 
 export function renderPlayers() {
+  renderScreenMeta();
   els.playerList.innerHTML = "";
   state.players.forEach((player) => {
     const item = document.createElement("li");
@@ -354,41 +410,124 @@ function openingRollFor(player) {
   return match ? match[1] : null;
 }
 
-function createOpponentBoard(player) {
+function initialOf(name) {
+  const letter = String(name || "?").trim().charAt(0);
+  return letter ? letter.toUpperCase() : "?";
+}
+
+function cardIsLoser(card) {
+  if (!state.loserId) {
+    return false;
+  }
+  const id = card.dataset.playerId;
+  if (String(id) === String(state.loserId)) {
+    return true;
+  }
+  const player = state.players.find((item) => String(item.id) === String(id));
+  return player ? playerMatches(player, state.loserId) : false;
+}
+
+function renderLoserMarkers() {
+  document.querySelectorAll(".opponent-board").forEach((card) => {
+    const marker = card.querySelector(".loser-marker");
+    if (marker) {
+      marker.hidden = !cardIsLoser(card);
+    }
+  });
+}
+
+function renderScreenMeta() {
+  const count = document.getElementById("player-count-label");
+  const round = document.getElementById("round-label");
+  if (count) {
+    count.textContent = String(state.players.length);
+  }
+  if (round) {
+    round.textContent = String(state.round || 1);
+  }
+
+  const self = state.players.find((player) => player.id === localPlayerId());
+  const name = self?.name || "You";
+  const nameEl = document.getElementById("local-player-name");
+  const avatarEl = document.getElementById("local-avatar");
+  if (nameEl) {
+    if (/^\s*you\s*$/i.test(name) || /\(\s*you\s*\)/i.test(name)) {
+      nameEl.textContent = name;
+    } else {
+      nameEl.textContent = `${name} (You)`;
+    }
+  }
+  if (avatarEl) {
+    avatarEl.textContent = initialOf(name);
+  }
+}
+
+function createOpponentBoard(player, index) {
   const roll = openingRollFor(player);
+  const color = OPPONENT_COLORS[index % OPPONENT_COLORS.length];
   const card = document.createElement("section");
-  card.className = "table-felt rounded-4 p-3 opponent-board";
+  card.className = "opponent-board";
   card.dataset.playerId = player.id;
+  card.style.background = `${color}22`;
+  card.style.borderColor = color;
+  card.style.setProperty("--player", color);
   card.setAttribute("aria-label", `${player.name} table`);
 
-  const title = document.createElement("div");
-  title.className = "opponent-board-name";
-  title.textContent = player.name;
-  card.appendChild(title);
+  const head = document.createElement("div");
+  head.className = "card-head";
 
+  const identity = document.createElement("div");
+  identity.className = "card-identity";
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.setAttribute("aria-hidden", "true");
+  avatar.textContent = initialOf(player.name);
+
+  const idText = document.createElement("div");
+  idText.className = "card-id-text";
+  const name = document.createElement("div");
+  name.className = "card-name";
+  name.textContent = player.name;
+  const status = document.createElement("div");
+  status.className = "card-status";
+  status.textContent = "Waiting · [PTS]";
+  idText.append(name, status);
+  identity.append(avatar, idText);
+
+  const pills = document.createElement("div");
+  pills.className = "card-pills";
   const wallet = document.createElement("div");
-  wallet.className = "opponent-board-wallet";
-  wallet.dataset.playerWallet = String(player.id);
-  const walletLabel = document.createElement("span");
-  walletLabel.className = "small text-white-50";
-  walletLabel.textContent = "Wallet";
+  wallet.className = "wallet-pill";
   const walletAmount = document.createElement("span");
-  walletAmount.className = "font-monospace ms-1";
+  walletAmount.dataset.playerWallet = String(player.id);
   walletAmount.textContent = formatMoney(player.wallet);
-  wallet.append(walletLabel, walletAmount);
-  card.appendChild(wallet);
+  const unit = document.createElement("span");
+  unit.textContent = " [CURRENCY]";
+  wallet.append(walletAmount, unit);
 
+  const timer = document.createElement("div");
+  timer.className = "timer-pill";
+  const timerValue = document.createElement("span");
+  timerValue.className = "timer-pill-value";
+  timerValue.textContent = "--:--";
+  timer.appendChild(timerValue);
+  pills.append(wallet, timer);
+  head.append(identity, pills);
+  card.appendChild(head);
+
+  const lanes = document.createElement("div");
+  lanes.className = "lanes";
   [
-    { row: 4, label: "set2" },
-    { row: 3, label: "set1" },
-    { row: 2, label: "flux" },
+    { row: 3, label: "KEEP1" },
+    { row: 4, label: "KEEP2" },
+    { row: 2, label: "FLUX" },
   ].forEach(({ row, label }) => {
     const boardRow = document.createElement("div");
-    boardRow.className = "board-row mb-2";
-    boardRow.dataset.row = String(row);
+    boardRow.className = "lane";
 
     const rowLabel = document.createElement("div");
-    rowLabel.className = "board-row-label";
+    rowLabel.className = "lane-label";
     rowLabel.textContent = label;
 
     const slots = document.createElement("div");
@@ -398,8 +537,24 @@ function createOpponentBoard(player) {
     appendRowSlots(slots, row, roll, true, true);
 
     boardRow.append(rowLabel, slots);
-    card.appendChild(boardRow);
+    lanes.appendChild(boardRow);
   });
+  card.appendChild(lanes);
+
+  const marker = document.createElement("div");
+  marker.className = "loser-marker";
+  marker.hidden = true;
+  const tag = document.createElement("div");
+  tag.className = "loser-tag";
+  tag.textContent = "LOSER";
+  const note = document.createElement("div");
+  note.className = "loser-note";
+  note.textContent = "Reroll required";
+  const attempts = document.createElement("div");
+  attempts.className = "loser-note-dim";
+  attempts.textContent = "2 attempts max";
+  marker.append(tag, note, attempts);
+  card.appendChild(marker);
 
   return card;
 }
@@ -412,9 +567,11 @@ export function renderOpponentBoards() {
   els.opponentBoards.innerHTML = "";
   const opponents = otherPlayers();
   els.opponentBoards.hidden = opponents.length === 0;
-  opponents.forEach((player) => {
-    els.opponentBoards.appendChild(createOpponentBoard(player));
+  opponents.forEach((player, index) => {
+    els.opponentBoards.appendChild(createOpponentBoard(player, index));
   });
+  renderLoserMarkers();
+  paintTimers();
 }
 
 export function renderRanking() {
@@ -576,6 +733,7 @@ export function setOpeningTallyOkBusy(busy) {
 }
 
 export function renderBoard() {
+  renderScreenMeta();
   const hosts = { 2: els.flux, 3: els.set1, 4: els.set2 };
   Object.values(hosts).forEach((row) => {
     row.innerHTML = "";
@@ -652,9 +810,14 @@ export function renderBoard() {
     }
   }
   if (els.rerollSubmitBtn) {
+    const rerollCount = (state.rerollSlots ?? []).filter(
+      (dieIndex) => dieIndex != null && state.values[dieIndex] != null
+    ).length;
+    els.rerollSubmitBtn.textContent = `Reroll ${rerollCount} dice`;
     els.rerollSubmitBtn.disabled = !rerollInteractive;
   }
 
+  renderLoserMarkers();
   renderOpeningTallyActions();
 }
 

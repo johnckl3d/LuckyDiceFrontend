@@ -20,166 +20,322 @@ body {
   border-radius: 1rem;
 }
 
-#turn-status {
-  color: #3d342c;
-  font-weight: 500;
+#game-screen {
+  min-height: calc(100vh - 56px);
+  background: linear-gradient(180deg, #0b1b3f 0%, #071129 100%);
+  color: #ffffff;
+  font-family: Rubik, system-ui, -apple-system, sans-serif;
 }
 
-.table-felt {
-  background: radial-gradient(circle at 50% 20%, #2f7a4a, #1b4d32 70%);
-  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.35);
+#game-screen[hidden] {
+  display: none !important;
 }
 
-.player-board-header {
+.dice-race {
+  box-sizing: border-box;
+  width: min(100%, 390px);
+  min-height: max(844px, calc(100vh - 56px));
+  margin: 0 auto;
+  padding: 44px 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.race-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
+  gap: 8px;
 }
 
-.player-board-wallet,
-.player-board-game,
-.player-board-stake {
-  font-variant-numeric: tabular-nums;
+.race-title {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
-.player-board-game {
+.race-meta,
+.race-dim {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.race-header-actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.race-utility,
+.race-btn {
+  box-sizing: border-box;
+  font-family: Rubik, system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+}
+
+.race-utility {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.race-utility-block {
+  width: 100%;
+  justify-content: center;
+  height: 46px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.stakes-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.stakes-value {
+  font-weight: 700;
+}
+
+.opponent-boards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.opponent-board,
+.local-card {
+  position: relative;
+  box-sizing: border-box;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.opponent-board {
+  padding: 8px 10px;
+  gap: 5px;
+  background: #2a8cff22;
+  border: 1px solid #2a8cff;
+}
+
+.local-card {
+  margin-top: auto;
+  padding: 10px;
+  gap: 6px;
+  background: #ff5a5a22;
+  border: 1px solid #ff5a5a;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  overflow-wrap: anywhere;
+  flex: 1;
 }
 
-.board-row-label {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  margin-bottom: 0.5rem;
+.card-id-text {
+  min-width: 0;
+}
+
+.avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  color: #0b1b3f;
+  background: var(--player, #2a8cff);
+}
+
+.avatar-local {
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  background: #ff5a5a;
+}
+
+.card-name {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.local-card .card-name {
+  font-size: 16px;
+}
+
+.card-status,
+#turn-status {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+  color: #ffffff;
+  margin: 0;
+}
+
+.local-card .card-status,
+.local-card #turn-status {
+  font-size: 12px;
+}
+
+.card-pills {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.wallet-pill,
+.timer-pill {
+  height: 22px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.local-card .wallet-pill,
+.local-card .timer-pill {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.wallet-pill {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.timer-pill {
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  opacity: 0.5;
+}
+
+.timer-pill.is-active {
+  border: 0;
+  background: #ffc400;
+  color: #0b1b3f;
+  opacity: 1;
+  font-weight: 800;
+}
+
+.lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.opponent-board .lanes {
+  gap: 5px;
+}
+
+.lane {
+  display: flex;
+  align-items: center;
+}
+
+.lane-label {
+  width: 52px;
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  opacity: 0.7;
+}
+
+.opponent-board .lane-label {
+  width: 40px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
 }
 
 .dice-slots {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.75rem;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.opponent-board .dice-slots {
+  gap: 6px;
 }
 
 .die-slot {
-  width: 76px;
-  height: 76px;
-  border: 2px dashed rgba(255, 255, 255, 0.35);
-  border-radius: 16px;
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.12);
+}
+
+.die-slot:has(.die) {
+  border: 0;
+  background: transparent;
+  border-radius: 9px;
+  box-shadow: 0 3px 0 #7fa0d8;
 }
 
 .die-slot.is-over {
-  border-color: #ffd166;
-  background: rgba(255, 209, 102, 0.18);
+  border-color: #ffc400;
+  background: rgba(255, 196, 0, 0.18);
 }
 
-.board-row-actions {
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-#opening-tally-actions:not([hidden]),
-#challenge-wait-message:not([hidden]) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-#challenge-wait-message:not([hidden]) {
-  color: #fff;
-}
-
-#board-actions-controls:not([hidden]) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-#board-actions-controls.is-submit-end:not([hidden]) {
-  flex-direction: row-reverse;
-}
-
-#board-actions-controls[hidden] {
-  display: none !important;
-}
-
-#rerollActionBar:not([hidden]),
-#acknowledgementActionBar:not([hidden]),
-#resultActionBar:not([hidden]),
-#waitingActionBar:not([hidden]) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.acknowledgement-labels {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 1.5rem;
-}
-
-.acknowledgement-ok-btn,
-.result-bar-actions {
-  margin-left: auto;
-}
-
-.result-bar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-#rerollActionBar[hidden],
-#acknowledgementActionBar[hidden],
-#resultActionBar[hidden],
-#waitingActionBar[hidden],
-#actionBar[hidden] {
-  display: none !important;
-}
-
-.reroll-slots {
-  flex: 1 1 auto;
-  justify-content: flex-start;
-}
-
-.timer-digits {
-  font-size: 1.75rem;
-  line-height: 1;
-  min-width: 3ch;
+.die-slot-compact,
+.opponent-board .die-slot {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
 }
 
 .die {
-  width: 72px;
-  height: 72px;
-  border: 0;
-  border-radius: 14px;
-  background: #f8f4ef;
-  box-shadow:
-    0 8px 0 #c9c0b5,
-    0 12px 18px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid #b9cdee;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: none;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  padding: 10px;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: default;
+  appearance: none;
+  line-height: 0;
 }
 
 .die.is-draggable {
@@ -190,30 +346,43 @@ body {
   opacity: 0.55;
 }
 
-.die:hover {
-  transform: translateY(-2px);
+.die:hover,
+.die-compact:hover,
+.die:disabled {
+  transform: none;
+  opacity: 1;
 }
 
 .die.is-selected {
-  outline: 3px solid #7bdff2;
+  outline: 2px solid #7bdff2;
+  outline-offset: 1px;
 }
 
 .die.is-reroll {
-  outline: 3px solid #ef476f;
-  transform: translateY(4px);
-}
-
-.die.is-rolling {
-  animation: shake 0.45s ease;
+  outline: 2px solid #ff5a5a;
+  outline-offset: 1px;
 }
 
 .pip {
-  width: 12px;
-  height: 12px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: #1f1a17;
+  background: #0b1b3f;
   margin: auto;
   opacity: 0;
+}
+
+.die-compact {
+  width: 22px;
+  height: 22px;
+  padding: 2px;
+  border-radius: 5px;
+  cursor: default;
+}
+
+.die-compact .pip {
+  width: 3.5px;
+  height: 3.5px;
 }
 
 .die[data-value="1"] .pip:nth-child(5),
@@ -240,65 +409,192 @@ body {
   opacity: 1;
 }
 
-@keyframes shake {
-  0%,
-  100% {
-    transform: rotate(0deg);
-  }
-  25% {
-    transform: rotate(-12deg);
-  }
-  75% {
-    transform: rotate(12deg);
-  }
+.loser-marker {
+  position: absolute;
+  right: 10px;
+  top: 44px;
+  width: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  text-align: right;
+  pointer-events: none;
 }
 
-.opponent-boards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
+.loser-tag {
+  background: #ff5a5a;
+  color: #0b1b3f;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
 }
 
-.opponent-board-name {
-  color: #fff;
-  font-weight: 600;
-  margin-bottom: 0.25rem;
+.loser-note {
+  font-size: 10px;
+  font-weight: 500;
 }
 
-.opponent-board-wallet {
-  color: #fff;
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 0.75rem;
+.loser-note-dim {
+  font-size: 10px;
+  opacity: 0.7;
 }
 
-.die-slot-compact {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+.local-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.die-compact {
-  width: 36px;
+.race-btn {
+  width: 100%;
+  height: 46px;
+  border: 0;
+  border-radius: 14px;
+  background: #ff5a5a;
+  color: #0b1b3f;
+  font-size: 16px;
+  font-weight: 800;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+.race-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ack-line,
+.waiting-bar-message,
+.challenge-wait-message {
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.acknowledgement-labels,
+.result-bar-actions,
+#opening-tally-actions:not([hidden]),
+#board-actions-controls:not([hidden]),
+#rerollActionBar:not([hidden]),
+#acknowledgementActionBar:not([hidden]),
+#resultActionBar:not([hidden]),
+#waitingActionBar:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+#board-actions-controls.is-submit-end:not([hidden]) {
+  flex-direction: column;
+}
+
+.race-sr,
+.timer-bar {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.table-tools {
+  color: #ffffff;
+}
+
+.table-tools summary {
   height: 36px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.tools-card {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.tools-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.seat-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.seat-label select {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 8px;
-  padding: 5px;
-  box-shadow:
-    0 4px 0 #c9c0b5,
-    0 6px 10px rgba(0, 0, 0, 0.25);
-  cursor: default;
+  height: 32px;
+  padding: 0 8px;
 }
 
-.die-compact .pip {
-  width: 6px;
-  height: 6px;
+#game-screen .list-group-item {
+  background: transparent;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.12);
+  font-size: 12px;
 }
 
-.die-compact:hover {
-  transform: none;
+#game-screen .list-group-item-warning {
+  background: rgba(255, 196, 0, 0.16);
+  color: #ffffff;
 }
 
-#ranking-table td:last-child,
-#ranking-table th:last-child {
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.ranking-table th,
+.ranking-table td {
+  padding: 4px 2px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ranking-table td:last-child,
+.ranking-table th:last-child {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.ranking-note {
+  margin-top: 8px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+#game-screen [hidden] {
+  display: none !important;
+}
+
+@media (max-width: 360px) {
+  .local-card .die,
+  .local-card .die-slot {
+    width: 32px;
+    height: 32px;
+  }
 }
