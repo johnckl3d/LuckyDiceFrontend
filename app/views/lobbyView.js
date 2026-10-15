@@ -1,3 +1,4 @@
+import { currency } from "../config.js";
 import { getSession } from "../models/loginModel.js";
 import { normalizeLobbyGame, seatsFilled } from "../models/lobbyModel.js";
 
@@ -5,6 +6,14 @@ const els = {
   screen: document.getElementById("lobby-screen"),
   walletBalance: document.getElementById("wallet-balance"),
   topUpBtn: document.getElementById("topup-btn"),
+  topUpScreen: document.getElementById("topup-screen"),
+  topUpBackBtn: document.getElementById("topup-back-btn"),
+  topUpAmountDisplay: document.getElementById("topup-amount-display"),
+  topUpMinus: document.getElementById("topup-minus"),
+  topUpPlus: document.getElementById("topup-plus"),
+  topUpChips: [...document.querySelectorAll("#topup-screen [data-amount]")],
+  topUpSwipe: document.getElementById("topup-swipe"),
+  topUpSwipeKnob: document.getElementById("topup-swipe-knob"),
   topUpModal: document.getElementById("wallet-topup-modal"),
   topUpTitle: document.getElementById("wallet-topup-title"),
   topUpForm: document.getElementById("wallet-topup-form"),
@@ -99,6 +108,7 @@ export function showLobby() {
 }
 
 export function hideLobby() {
+  hideTopUpPage();
   els.screen.hidden = true;
   els.lobbyNav.hidden = false;
   setAppNavHidden(false);
@@ -342,6 +352,144 @@ export function showReadyWaiting() {
   }
 }
 
+const TOPUP_MIN = 10;
+const TOPUP_MAX = 1000;
+const TOPUP_STEP = 50;
+
+let swipeOffset = 0;
+let swipeDragging = false;
+
+function pageAmount() {
+  const amount = Number(els.topUpAmount.value);
+  return Number.isInteger(amount) ? amount : TOPUP_STEP;
+}
+
+function applyTopUpCurrency() {
+  const root = els.topUpScreen;
+  if (!root) {
+    return;
+  }
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let node = walker.nextNode();
+  while (node) {
+    if (node.nodeValue.includes("[CURRENCY]")) {
+      nodes.push(node);
+    }
+    node = walker.nextNode();
+  }
+  nodes.forEach((textNode) => {
+    textNode.nodeValue = textNode.nodeValue.replaceAll("[CURRENCY]", currency);
+  });
+}
+
+applyTopUpCurrency();
+
+function renderTopUpAmount(amount) {
+  if (els.topUpAmountDisplay) {
+    els.topUpAmountDisplay.textContent = `${currency} ${amount}`;
+  }
+  els.topUpChips.forEach((chip) => {
+    const selected = Number(chip.dataset.amount) === amount;
+    chip.classList.toggle("is-selected", selected);
+    chip.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+  if (els.topUpMinus) {
+    els.topUpMinus.disabled = amount <= TOPUP_MIN;
+  }
+  if (els.topUpPlus) {
+    els.topUpPlus.disabled = amount >= TOPUP_MAX;
+  }
+}
+
+function writeTopUpAmount(amount) {
+  const next = Math.min(TOPUP_MAX, Math.max(TOPUP_MIN, amount));
+  els.topUpAmount.value = String(next);
+  renderTopUpAmount(next);
+}
+
+function setSwipeOffset(offset, animate) {
+  swipeOffset = offset;
+  if (!els.topUpSwipeKnob) {
+    return;
+  }
+  els.topUpSwipeKnob.style.transition = animate ? "transform 180ms ease" : "none";
+  els.topUpSwipeKnob.style.transform = `translateX(${offset}px)`;
+}
+
+function resetSwipe() {
+  swipeDragging = false;
+  setSwipeOffset(0, true);
+}
+
+function swipeMax() {
+  if (!els.topUpSwipe || !els.topUpSwipeKnob) {
+    return 0;
+  }
+  return Math.max(0, els.topUpSwipe.clientWidth - els.topUpSwipeKnob.clientWidth - 16);
+}
+
+function showTopUpPage() {
+  els.walletAction.value = "topup";
+  applyWalletAction();
+  renderTopUpAmount(pageAmount());
+  resetSwipe();
+  els.topUpScreen.hidden = false;
+  els.screen.hidden = true;
+}
+
+function hideTopUpPage() {
+  if (!els.topUpScreen) {
+    return;
+  }
+  els.topUpScreen.hidden = true;
+  resetSwipe();
+}
+
+function backFromTopUp() {
+  hideTopUpPage();
+  els.screen.hidden = false;
+}
+
+function bindTopUpSwipe() {
+  const knob = els.topUpSwipeKnob;
+  if (!knob) {
+    return;
+  }
+  let startX = 0;
+  let origin = 0;
+
+  knob.addEventListener("pointerdown", (event) => {
+    if (els.topUpSubmitBtn.disabled) {
+      return;
+    }
+    swipeDragging = true;
+    startX = event.clientX;
+    origin = swipeOffset;
+    knob.setPointerCapture(event.pointerId);
+    setSwipeOffset(swipeOffset, false);
+  });
+  knob.addEventListener("pointermove", (event) => {
+    if (!swipeDragging) {
+      return;
+    }
+    const next = Math.min(swipeMax(), Math.max(0, origin + event.clientX - startX));
+    setSwipeOffset(next, false);
+  });
+  const finishSwipe = () => {
+    if (!swipeDragging) {
+      return;
+    }
+    const completed = swipeOffset >= swipeMax() * 0.85 && swipeMax() > 0;
+    resetSwipe();
+    if (completed) {
+      els.topUpForm.requestSubmit();
+    }
+  };
+  knob.addEventListener("pointerup", finishSwipe);
+  knob.addEventListener("pointercancel", finishSwipe);
+}
+
 export function bindLobbyView({
   onCreate,
   onRefresh,
@@ -368,7 +516,14 @@ export function bindLobbyView({
   els.lobbyLogout?.addEventListener("click", () => {
     document.getElementById("logout-btn")?.click();
   });
-  els.topUpBtn.addEventListener("click", () => showTopUpPopup());
+  els.topUpBtn.addEventListener("click", () => showTopUpPage());
+  els.topUpBackBtn?.addEventListener("click", () => backFromTopUp());
+  els.topUpMinus?.addEventListener("click", () => writeTopUpAmount(pageAmount() - TOPUP_STEP));
+  els.topUpPlus?.addEventListener("click", () => writeTopUpAmount(pageAmount() + TOPUP_STEP));
+  els.topUpChips.forEach((chip) => {
+    chip.addEventListener("click", () => writeTopUpAmount(Number(chip.dataset.amount)));
+  });
+  bindTopUpSwipe();
   els.walletAction.addEventListener("change", () => {
     showTopUpError("");
     applyWalletAction();

@@ -221,6 +221,81 @@
       </main>
     </div>
 
+    <div id="topup-screen" hidden>
+      <main class="topup-phone">
+        <header class="topup-header">
+          <button type="button" class="topup-icon-btn" id="topup-back-btn" aria-label="Back">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </button>
+          <h1 class="topup-title">Add Funds</h1>
+          <span class="topup-header-spacer" aria-hidden="true"></span>
+        </header>
+
+        <section class="topup-card" aria-labelledby="topup-set-amount">
+          <div class="topup-card-head">
+            <h2 id="topup-set-amount">Set Amount</h2>
+            <span class="topup-icon-btn topup-icon-btn-sm" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </span>
+          </div>
+          <p class="topup-subtitle">How much would you like to top up?</p>
+          <div class="topup-amount-row">
+            <button type="button" class="topup-step" id="topup-minus" aria-label="Decrease amount">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                <path d="M4 8h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+              </svg>
+            </button>
+            <div class="topup-amount" id="topup-amount-display">[CURRENCY] 50</div>
+            <button type="button" class="topup-step" id="topup-plus" aria-label="Increase amount">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                <path d="M8 4v8M4 8h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="topup-chips" role="group" aria-label="Preset amounts">
+            <button type="button" class="topup-chip" data-amount="50">[CURRENCY] 50</button>
+            <button type="button" class="topup-chip" data-amount="100">[CURRENCY] 100</button>
+            <button type="button" class="topup-chip" data-amount="500">[CURRENCY] 500</button>
+            <button type="button" class="topup-chip" data-amount="1000">[CURRENCY] 1000</button>
+          </div>
+        </section>
+
+        <div class="topup-swipe" id="topup-swipe">
+          <button type="button" class="topup-swipe-knob" id="topup-swipe-knob" aria-label="Swipe to top up">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </button>
+          <span class="topup-swipe-label">Swipe to topup</span>
+          <span class="topup-swipe-chevrons" aria-hidden="true">
+            <svg viewBox="0 0 36 16" width="36" height="16">
+              <path d="M4 3.5 8.5 8 4 12.5M15 3.5 19.5 8 15 12.5M26 3.5 30.5 8 26 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </span>
+        </div>
+
+        <section class="topup-card" aria-label="Transactions">
+          <div class="topup-card-head">
+            <h2>Transactions</h2>
+            <span class="topup-icon-btn topup-icon-btn-sm" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </span>
+          </div>
+          <div class="topup-tx">
+            <span class="topup-tx-icon" aria-hidden="true">Ł</span>
+            <span class="topup-tx-name">Litecoin</span>
+            <span class="topup-tx-amount">-[CURRENCY] 79.49</span>
+          </div>
+        </section>
+      </main>
+    </div>
+
     <div class="modal fade" id="wallet-topup-modal" tabindex="-1" aria-labelledby="wallet-topup-title" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
