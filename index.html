@@ -18,39 +18,92 @@
   </head>
   <body>
     <div id="login-screen" class="login-screen">
-      <div class="login-card card shadow">
-        <div class="card-body p-4">
-          <h1 class="h4 mb-1">Lucky Dice</h1>
-          <p class="text-muted mb-4">Sign in to play</p>
-          <form id="login-form" novalidate>
-            <div class="mb-3">
-              <label class="form-label" for="login-userid">User ID</label>
-              <input
-                class="form-control"
-                id="login-userid"
-                name="userId"
-                autocomplete="username"
-                required
-              />
-            </div>
-            <div class="mb-3">
-              <label class="form-label" for="login-password">Password</label>
-              <input
-                type="password"
-                class="form-control"
-                id="login-password"
-                name="password"
-                autocomplete="current-password"
-                required
-              />
-            </div>
-            <div class="alert alert-danger d-none" id="login-error" role="alert"></div>
-            <button type="submit" class="btn btn-dark w-100" id="login-submit">
-              Log in
-            </button>
-          </form>
-          <a class="btn btn-outline-dark w-100 mt-3" href="register.html">Register</a>
+      <div class="login-phone">
+        <header class="login-top">
+          <div class="login-brand">
+            <span class="login-mark" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.2"></circle>
+                <circle cx="8" cy="8" r="1.2" fill="currentColor"></circle>
+              </svg>
+            </span>
+            <span class="login-wordmark">Lucky Dice</span>
+          </div>
+          <a class="login-account" href="register.html">Need an account? <strong>Register</strong></a>
+        </header>
+
+        <div class="login-art" aria-hidden="true">
+          <svg viewBox="0 0 360 230" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="login-moon" cx="35%" cy="32%" r="70%">
+                <stop offset="0%" stop-color="#eef4ff"></stop>
+                <stop offset="50%" stop-color="#8eb0e0"></stop>
+                <stop offset="100%" stop-color="#4c6ea8"></stop>
+              </radialGradient>
+              <radialGradient id="login-planet" cx="32%" cy="28%" r="75%">
+                <stop offset="0%" stop-color="#8ec5ff"></stop>
+                <stop offset="42%" stop-color="#3b7cf0"></stop>
+                <stop offset="100%" stop-color="#1a3f8c"></stop>
+              </radialGradient>
+              <radialGradient id="login-ufo-glow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#7ee8ff" stop-opacity="0.85"></stop>
+                <stop offset="100%" stop-color="#7ee8ff" stop-opacity="0"></stop>
+              </radialGradient>
+              <linearGradient id="login-hull" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#c5dcff"></stop>
+                <stop offset="40%" stop-color="#6ea0ee"></stop>
+                <stop offset="100%" stop-color="#2a4ea8"></stop>
+              </linearGradient>
+              <linearGradient id="login-dome" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f4fbff"></stop>
+                <stop offset="100%" stop-color="#9fd0ff"></stop>
+              </linearGradient>
+            </defs>
+            <circle cx="58" cy="52" r="26" fill="url(#login-moon)"></circle>
+            <circle cx="50" cy="46" r="4" fill="#6e8ebc" opacity="0.4"></circle>
+            <circle cx="68" cy="60" r="3" fill="#6e8ebc" opacity="0.35"></circle>
+            <circle cx="318" cy="78" r="118" fill="url(#login-planet)"></circle>
+            <ellipse cx="318" cy="42" rx="88" ry="14" fill="#ffffff" opacity="0.12"></ellipse>
+            <ellipse cx="300" cy="108" rx="104" ry="16" fill="#0c2458" opacity="0.18"></ellipse>
+            <ellipse cx="332" cy="146" rx="72" ry="11" fill="#d7ecff" opacity="0.14"></ellipse>
+            <ellipse cx="214" cy="138" rx="52" ry="12" fill="url(#login-ufo-glow)"></ellipse>
+            <path d="M172 116c16-30 68-30 84 0" fill="url(#login-dome)"></path>
+            <ellipse cx="214" cy="118" rx="64" ry="16" fill="url(#login-hull)"></ellipse>
+            <ellipse cx="214" cy="114" rx="38" ry="5" fill="#ffffff" opacity="0.35"></ellipse>
+            <circle cx="184" cy="124" r="3" fill="#7ef0ff"></circle>
+            <circle cx="199" cy="127" r="3" fill="#7ef0ff"></circle>
+            <circle cx="214" cy="128" r="3" fill="#7ef0ff"></circle>
+            <circle cx="229" cy="127" r="3" fill="#7ef0ff"></circle>
+            <circle cx="244" cy="124" r="3" fill="#7ef0ff"></circle>
+          </svg>
         </div>
+
+        <h1 class="login-title">Sign in</h1>
+        <p class="login-subtitle">Sign in with user ID</p>
+        <form id="login-form" class="login-form" novalidate>
+          <label class="login-label" for="login-userid">User ID</label>
+          <input
+            class="login-input"
+            id="login-userid"
+            name="userId"
+            autocomplete="username"
+            placeholder="User ID"
+            required
+          />
+          <label class="login-label" for="login-password">Password</label>
+          <input
+            type="password"
+            class="login-input"
+            id="login-password"
+            name="password"
+            autocomplete="current-password"
+            placeholder="Password"
+            required
+          />
+          <div class="alert alert-danger d-none login-error" id="login-error" role="alert"></div>
+          <button type="submit" class="login-continue" id="login-submit">Continue</button>
+        </form>
+        <footer class="login-foot">Lucky Dice</footer>
       </div>
     </div>
 
