@@ -1,4 +1,5 @@
-import { normalizeLobbyGame, playerNames, seatsFilled, statusLabel } from "../models/lobbyModel.js";
+import { getSession } from "../models/loginModel.js";
+import { normalizeLobbyGame, seatsFilled } from "../models/lobbyModel.js";
 
 const els = {
   screen: document.getElementById("lobby-screen"),
@@ -19,9 +20,12 @@ const els = {
   error: document.getElementById("lobby-error"),
   createBtn: document.getElementById("create-game-btn"),
   refreshBtn: document.getElementById("refresh-lobby-btn"),
-  practiceBtn: document.getElementById("practice-table-btn"),
   leaderboardBtn: document.getElementById("leaderboard-btn"),
   gamesBody: document.getElementById("lobby-games-body"),
+  gear: document.getElementById("lobby-gear"),
+  gearBtn: document.getElementById("lobby-gear-btn"),
+  gearMenu: document.getElementById("lobby-gear-menu"),
+  lobbyLogout: document.getElementById("lobby-logout-btn"),
   lobbyNav: document.getElementById("lobby-nav-btn"),
   readyModal: document.getElementById("lobby-ready-modal"),
   readyTitle: document.getElementById("lobby-ready-title"),
@@ -48,6 +52,7 @@ function readyBody(buyIn) {
 }
 
 let readyModal = null;
+let joiningGameId = "";
 let topUpModal = null;
 let topUpWaitingModal = null;
 
@@ -75,14 +80,29 @@ function lobbyReadyModal() {
   return readyModal;
 }
 
+function setAppNavHidden(hidden) {
+  document.getElementById("app-nav")?.classList.toggle("d-none", hidden);
+}
+
+function setGearOpen(open) {
+  if (!els.gearMenu || !els.gearBtn) {
+    return;
+  }
+  els.gearMenu.hidden = !open;
+  els.gearBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
 export function showLobby() {
   els.screen.hidden = false;
   els.lobbyNav.hidden = true;
+  setAppNavHidden(true);
 }
 
 export function hideLobby() {
   els.screen.hidden = true;
   els.lobbyNav.hidden = false;
+  setAppNavHidden(false);
+  setGearOpen(false);
 }
 
 export function renderWalletBalance(balance) {
@@ -203,32 +223,69 @@ export function readCreateGameForm() {
   };
 }
 
+function canJoin(game) {
+  if (!game.gameId) {
+    return false;
+  }
+  const selfId = getSession()?.userId;
+  if (!selfId) {
+    return true;
+  }
+  return !(game.players ?? []).some(
+    (player) => String(player.playerId ?? player.PlayerId ?? "") === String(selfId)
+  );
+}
+
+export function setJoinBusy(gameId, busy) {
+  joiningGameId = busy ? String(gameId) : "";
+  els.gamesBody?.querySelectorAll("[data-join-game]").forEach((button) => {
+    button.disabled = busy;
+  });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+const WATCH_ICON = `<svg class="lobby-eye" viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M1.5 7s2.2-3.2 5.5-3.2S12.5 7 12.5 7s-2.2 3.2-5.5 3.2S1.5 7 1.5 7z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="7" cy="7" r="1.3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>`;
+
 export function renderLobbyGames(games) {
   const rows = games.map(normalizeLobbyGame);
   if (!rows.length) {
     els.gamesBody.innerHTML =
-      '<tr><td colspan="7" class="text-muted">No waiting or in-progress games.</td></tr>';
+      '<p class="lobby-empty">No waiting or in-progress games.</p>';
     return;
   }
 
   els.gamesBody.innerHTML = rows
     .map((game) => {
-      const label = game.displayId || game.gameId;
-      const started = game.gameStartDateTime
-        ? new Date(game.gameStartDateTime).toLocaleString()
-        : "—";
-      return `<tr>
-        <td>
-          <div class="fw-semibold">${label}</div>
-          <div class="small text-muted">${started}</div>
-        </td>
-        <td>${statusLabel(game.gameStatus)}</td>
-        <td>${seatsFilled(game)}</td>
-        <td>${game.waitingDuration}s</td>
-        <td>${game.turnTime}s</td>
-        <td>${game.stake}</td>
-        <td>${playerNames(game)}</td>
-      </tr>`;
+      const label = escapeHtml(game.displayId || game.gameId);
+      const waiting = game.gameStatus === 4;
+      const joinable = canJoin(game);
+      const seated = game.players?.length ?? 0;
+      const gameId = escapeHtml(game.gameId);
+      const action = joinable
+        ? `<button type="button" class="lobby-pill lobby-pill-play" data-join-game="${gameId}"${joiningGameId ? " disabled" : ""}>Join</button>`
+        : `<span class="lobby-pill ${waiting ? "lobby-pill-play" : "lobby-pill-watch"}">${waiting ? "Full" : `${WATCH_ICON}Watch`}</span>`;
+      return `<article class="lobby-card">
+        <div class="lobby-card-top">
+          <span class="lobby-cards" aria-hidden="true"></span>
+          <div class="lobby-card-copy">
+            <div class="lobby-kicker">TABLE</div>
+            <div class="lobby-name">${label}</div>
+          </div>
+          ${action}
+        </div>
+        <div class="lobby-meta">
+          <div><span class="lobby-kicker">SEATS</span><strong>${escapeHtml(seatsFilled(game))}</strong></div>
+          <div><span class="lobby-kicker">STAKE</span><strong>${escapeHtml(game.stake)}</strong></div>
+          <div><span class="lobby-kicker">PLAYERS</span><strong>${escapeHtml(seated)}</strong></div>
+        </div>
+      </article>`;
     })
     .join("");
 }
@@ -288,7 +345,7 @@ export function showReadyWaiting() {
 export function bindLobbyView({
   onCreate,
   onRefresh,
-  onPracticeTable,
+  onJoin,
   onLeaderboard,
   onBackToLobby,
   onReadyCancel,
@@ -299,6 +356,18 @@ export function bindLobbyView({
     event.preventDefault();
     onCreate();
   });
+  els.gearBtn?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setGearOpen(els.gearMenu.hidden);
+  });
+  document.addEventListener("click", (event) => {
+    if (!els.gear?.contains(event.target)) {
+      setGearOpen(false);
+    }
+  });
+  els.lobbyLogout?.addEventListener("click", () => {
+    document.getElementById("logout-btn")?.click();
+  });
   els.topUpBtn.addEventListener("click", () => showTopUpPopup());
   els.walletAction.addEventListener("change", () => {
     showTopUpError("");
@@ -308,8 +377,17 @@ export function bindLobbyView({
     event.preventDefault();
     onTopUp();
   });
-  els.refreshBtn.addEventListener("click", () => onRefresh());
-  els.practiceBtn.addEventListener("click", () => onPracticeTable());
+  els.refreshBtn.addEventListener("click", () => {
+    setGearOpen(false);
+    onRefresh();
+  });
+  els.gamesBody?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-join-game]");
+    if (!button || button.disabled) {
+      return;
+    }
+    onJoin?.(button.dataset.joinGame);
+  });
   els.leaderboardBtn.addEventListener("click", () => onLeaderboard());
   els.lobbyNav.addEventListener("click", () => onBackToLobby());
   els.readyCancelBtn?.addEventListener("click", () => onReadyCancel?.());

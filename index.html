@@ -55,7 +55,7 @@
     </div>
 
     <div id="app-screen" hidden>
-    <nav class="navbar navbar-dark bg-dark">
+    <nav class="navbar navbar-dark bg-dark" id="app-nav">
       <div class="container-fluid px-3 px-md-4">
         <span class="navbar-brand mb-0 h1">Lucky Dice</span>
         <div class="d-flex align-items-center gap-3">
@@ -72,96 +72,98 @@
     </nav>
 
     <div id="lobby-screen">
-      <main class="container py-3 py-md-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2 class="h5 mb-0">Lobby</h2>
-          <div class="text-end">
-            <div class="small text-muted text-uppercase">Balance</div>
-            <div class="d-flex align-items-center justify-content-end gap-2">
-              <div class="fs-4 fw-semibold font-monospace lh-1" id="wallet-balance">—</div>
-              <button type="button" class="btn btn-outline-dark btn-sm" id="topup-btn">
-                Top up
+      <main class="lobby-phone">
+        <header class="lobby-header">
+          <div class="lobby-avatar" aria-hidden="true">
+            <svg viewBox="0 0 14 14" width="16" height="16">
+              <g fill="none" stroke="#8B93A7" stroke-width="1.4" stroke-linecap="round">
+                <circle cx="7" cy="4.5" r="2"></circle>
+                <path d="M3 12c.6-2 2.1-3 4-3s3.4 1 4 3"></path>
+              </g>
+            </svg>
+          </div>
+          <div class="lobby-greeting">
+            <div class="lobby-hello">Welcome back</div>
+            <div class="lobby-user" id="lobby-welcome"></div>
+          </div>
+          <div class="lobby-header-actions">
+            <div class="lobby-balance" id="wallet-balance">—</div>
+            <button type="button" class="lobby-icon-btn lobby-icon-btn-lime lobby-topup" id="topup-btn">
+              <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
+                <path d="M7 3.2v7.6M3.2 7h7.6" fill="none" stroke="#07140C" stroke-width="1.6" stroke-linecap="round"></path>
+              </svg>
+              Top Up
+            </button>
+            <button type="button" class="lobby-icon-btn" id="leaderboard-btn" aria-label="Leaderboard">
+              <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
+                <g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 1.8h6v3.2a3 3 0 0 1-6 0V1.8z"></path>
+                  <path d="M4 3H2.4A1.6 1.6 0 0 0 4 6.2"></path>
+                  <path d="M10 3h1.6A1.6 1.6 0 0 1 10 6.2"></path>
+                  <path d="M7 8v1.6M4.8 12h4.4"></path>
+                </g>
+              </svg>
+            </button>
+            <div class="lobby-gear" id="lobby-gear">
+              <button
+                type="button"
+                class="lobby-icon-btn"
+                id="lobby-gear-btn"
+                aria-label="Menu"
+                aria-expanded="false"
+                aria-controls="lobby-gear-menu"
+              >
+                <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
+                  <g fill="none" stroke="#F4F7FB" stroke-width="1.4" stroke-linecap="round">
+                    <circle cx="7" cy="7" r="1.7"></circle>
+                    <path d="M7 2.2v1.3M7 10.5v1.3M2.2 7h1.3M10.5 7h1.3M3.6 3.6l.9.9M9.5 9.5l.9.9M10.4 3.6l-.9.9M4.5 9.5l-.9.9"></path>
+                  </g>
+                </svg>
               </button>
+              <div class="lobby-menu" id="lobby-gear-menu" hidden>
+                <button type="button" id="refresh-lobby-btn">Refresh</button>
+                <button type="button" id="lobby-logout-btn">Log out</button>
+              </div>
             </div>
           </div>
+        </header>
+
+        <div class="lobby-panel" id="lobby-create-panel">
+          <form id="create-game-form" novalidate>
+            <div class="lobby-field">
+              <label for="create-player-count">Players</label>
+              <select id="create-player-count">
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+              </select>
+            </div>
+            <div class="lobby-field">
+              <label for="create-turn-time">Turn time</label>
+              <select id="create-turn-time">
+                <option value="30">30s</option>
+                <option value="300" selected>300s</option>
+              </select>
+            </div>
+            <div class="lobby-field">
+              <label for="create-stake">Stake</label>
+              <select id="create-stake">
+                <option value="10" selected>10</option>
+                <option value="30">30</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+            <div class="alert alert-danger d-none" id="lobby-error" role="alert"></div>
+            <button type="submit" class="lobby-create" id="create-game-btn">Create game</button>
+          </form>
         </div>
-        <div class="row g-4">
-          <div class="col-lg-4">
-            <div class="card shadow-sm">
-              <div class="card-header">Create game</div>
-              <div class="card-body">
-                <form id="create-game-form" novalidate>
-                  <div class="mb-3">
-                    <label class="form-label" for="create-player-count">Players</label>
-                    <select class="form-select" id="create-player-count">
-                      <option value="2" selected>2</option>
-                      <option value="3">3</option>
-                      <option value="4">4</option>
-                      <option value="5">5</option>
-                      <option value="6">6</option>
-                      <option value="7">7</option>
-                      <option value="8">8</option>
-                    </select>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label" for="create-turn-time">Turn time (seconds)</label>
-                    <select class="form-select" id="create-turn-time">
-                      <option value="30">30</option>
-                      <option value="300" selected>300</option>
-                    </select>
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label" for="create-stake">Stake</label>
-                    <select class="form-select" id="create-stake">
-                      <option value="10" selected>10</option>
-                      <option value="30">30</option>
-                      <option value="50">50</option>
-                    </select>
-                  </div>
-                  <div class="alert alert-danger d-none" id="lobby-error" role="alert"></div>
-                  <button type="submit" class="btn btn-dark w-100" id="create-game-btn">
-                    Create game
-                  </button>
-                </form>
-              </div>
-            </div>
-            <button type="button" class="btn btn-outline-dark w-100 mt-3" id="leaderboard-btn">
-              Leaderboard
-            </button>
-            <button type="button" class="btn btn-outline-secondary w-100 mt-2" id="practice-table-btn">
-              Practice table
-            </button>
-          </div>
-          <div class="col-lg-8">
-            <div class="card shadow-sm">
-              <div class="card-header d-flex justify-content-between align-items-center">
-                Open games
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="refresh-lobby-btn">
-                  Refresh
-                </button>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-sm mb-0" id="lobby-games-table">
-                  <thead>
-                    <tr>
-                      <th>Game</th>
-                      <th>Status</th>
-                      <th>Seats</th>
-                      <th>Waiting</th>
-                      <th>Turn</th>
-                      <th>Stake</th>
-                      <th>Players</th>
-                    </tr>
-                  </thead>
-                  <tbody id="lobby-games-body">
-                    <tr>
-                      <td colspan="7" class="text-muted">Loading games…</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+
+        <div class="lobby-list" id="lobby-games-body">
+          <p class="lobby-empty">Loading games…</p>
         </div>
       </main>
     </div>

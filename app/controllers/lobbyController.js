@@ -16,6 +16,7 @@ import {
   hideSeatsFilledPopup,
   readCreateGameForm,
   renderLobbyGames,
+  setJoinBusy,
   hideTopUpPopup,
   hideTopUpWaiting,
   readTopUpAmount,
@@ -173,18 +174,30 @@ async function handleCreate() {
   }
 }
 
+async function handleJoin(gameId) {
+  const game = listedGames.find(
+    (item) => String(item?.gameId ?? item?.GameId ?? "") === String(gameId)
+  );
+  if (!game) {
+    showLobbyError("That game is no longer in the lobby.");
+    return;
+  }
+  const id = game.gameId ?? game.GameId;
+  const stake = game.stake ?? game.Stake;
+  setJoinBusy(id, true);
+  showLobbyError("");
+  try {
+    await enterGame({ gameId: id, stake, buyIn: stake });
+  } finally {
+    setJoinBusy("", false);
+  }
+}
+
 function stopPolling() {
   if (pollId !== null) {
     window.clearInterval(pollId);
     pollId = null;
   }
-}
-
-function handlePracticeTable() {
-  stopPolling();
-  hideLobby();
-  leaveLeaderboard();
-  enterGame();
 }
 
 function handleOpenLeaderboard() {
@@ -378,7 +391,7 @@ export function initLobbyController() {
   bindLobbyView({
     onCreate: handleCreate,
     onRefresh: refreshGames,
-    onPracticeTable: handlePracticeTable,
+    onJoin: handleJoin,
     onLeaderboard: handleOpenLeaderboard,
     onBackToLobby: enterLobby,
     onReadyCancel: handleReadyCancel,

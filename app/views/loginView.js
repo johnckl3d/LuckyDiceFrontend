@@ -7,6 +7,7 @@ const loginEls = {
   error: document.getElementById("login-error"),
   submit: document.getElementById("login-submit"),
   signedInUser: document.getElementById("signed-in-user"),
+  welcome: document.getElementById("lobby-welcome"),
   logout: document.getElementById("logout-btn"),
   sessionExpiredModal: document.getElementById("session-expired-modal"),
   sessionExpiredOk: document.getElementById("session-expired-ok-btn"),
@@ -39,12 +40,18 @@ export function showApp(session) {
   loginEls.screen.hidden = true;
   loginEls.app.hidden = false;
   loginEls.signedInUser.textContent = session.userId;
+  if (loginEls.welcome) {
+    loginEls.welcome.textContent = session.userId;
+  }
 }
 
 export function showLogin() {
   loginEls.app.hidden = true;
   loginEls.screen.hidden = false;
   loginEls.password.value = "";
+  if (loginEls.welcome) {
+    loginEls.welcome.textContent = "";
+  }
   showLoginError("");
   loginEls.userId.focus();
 }
