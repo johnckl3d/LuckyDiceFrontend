@@ -641,7 +641,7 @@ function initializeGameView(started) {
   const preservedTurnTime = sameGame ? state.turnTime : 0;
   const preservedStake = sameGame ? state.stake : null;
   const turnTime = Number(started.turnTime ?? started.TurnTime);
-  const stake = started.stake ?? started.Stake ?? started.buyIn ?? started.BuyIn;
+  const stake = started.stake ?? started.Stake ?? started.bet ?? started.Bet;
 
   clearTimer();
   hideResult();
@@ -1456,17 +1456,17 @@ async function joinResultGame() {
     gameId: state.gameId,
     playerId: localPlayerId(),
     request: 1,
-    buyIn: state.stake,
+    bet: state.stake,
   };
   try {
     const result = await onJoinGame(payload);
     if (readResultCode(result) === INSUFFICIENT_WALLET_CODE) {
       pendingJoin = {
-        started: { gameId: state.gameId, buyIn: state.stake },
+        started: { gameId: state.gameId, bet: state.stake },
         payload,
         mode: "again",
       };
-      promptWalletTopUp(payload.buyIn, { stayInGame: true });
+      promptWalletTopUp(payload.bet, { stayInGame: true });
       return;
     }
     pendingJoin = null;
@@ -1556,7 +1556,7 @@ function joinArgs(started, gameId) {
   return {
     gameId,
     playerId: localPlayerId(),
-    buyIn: started?.buyIn ?? started?.BuyIn ?? started?.stake ?? started?.Stake ?? state.stake,
+    bet: started?.bet ?? started?.Bet ?? started?.stake ?? started?.Stake ?? state.stake,
   };
 }
 
@@ -1622,7 +1622,7 @@ async function joinTable(started, gameId) {
   const code = readResultCode(result);
   if (code === INSUFFICIENT_WALLET_CODE) {
     pendingJoin = { started: { ...started, gameId }, payload, mode: "join" };
-    promptWalletTopUp(payload.buyIn);
+    promptWalletTopUp(payload.bet);
     return false;
   }
   pendingJoin = null;
@@ -1641,7 +1641,7 @@ export async function resumePendingJoin() {
     if (pending.mode === "again") {
       const result = await onJoinGame(pending.payload);
       if (readResultCode(result) === INSUFFICIENT_WALLET_CODE) {
-        promptWalletTopUp(pending.payload.buyIn, { stayInGame: true });
+        promptWalletTopUp(pending.payload.bet, { stayInGame: true });
         return;
       }
       pendingJoin = null;
@@ -1700,7 +1700,7 @@ export async function enterGame(started) {
   }
 
   if (pendingJoin) {
-    promptWalletTopUp(pendingJoin.payload.buyIn);
+    promptWalletTopUp(pendingJoin.payload.bet);
     return;
   }
 

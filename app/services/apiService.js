@@ -361,8 +361,8 @@ export async function leaveLobbyGame(gameId) {
   return invoke("lobby", "/hubs/lobby", "LeaveGame", [gameId], true);
 }
 
-export async function joinGame({ gameId, playerId, buyIn }) {
-  return invoke("game", "/hubs/game", "joinGame", [{ gameId, playerId, buyIn }], true);
+export async function joinGame({ gameId, playerId, bet }) {
+  return invoke("game", "/hubs/game", "joinGame", [{ gameId, playerId, bet }], true);
 }
 
 export async function startGame(players) {
@@ -464,7 +464,7 @@ export async function onJoinGame(payload) {
         gameId: payload?.gameId,
         playerId: payload?.playerId,
         request: Number(payload?.request ?? 1),
-        buyIn: payload?.buyIn,
+        bet: payload?.bet,
       },
     ],
     true

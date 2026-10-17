@@ -205,7 +205,7 @@ async function handleJoin(gameId) {
   setJoinBusy(id, true);
   showLobbyError("");
   try {
-    await enterGame({ gameId: id, stake, buyIn: stake });
+    await enterGame({ gameId: id, stake, bet: stake });
   } finally {
     setJoinBusy("", false);
   }
@@ -239,7 +239,7 @@ function readAmount(value) {
 }
 
 function buyInForReady(game) {
-  const direct = readAmount(game?.buyIn ?? game?.BuyIn ?? game?.stake ?? game?.Stake);
+  const direct = readAmount(game?.bet ?? game?.Bet ?? game?.stake ?? game?.Stake);
   if (direct != null) {
     return direct;
   }
@@ -247,7 +247,7 @@ function buyInForReady(game) {
   const listed = listedGames.find(
     (item) => String(item?.gameId ?? item?.GameId ?? "") === String(gameId)
   );
-  return readAmount(listed?.buyIn ?? listed?.BuyIn ?? listed?.stake ?? listed?.Stake);
+  return readAmount(listed?.bet ?? listed?.Bet ?? listed?.stake ?? listed?.Stake);
 }
 
 async function handleGameReady(game) {
@@ -260,7 +260,7 @@ async function handleGameReady(game) {
   await refreshBalance();
   const readyMin = buyInForReady(game);
   // #region agent log
-  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f6f1a9'},body:JSON.stringify({sessionId:'f6f1a9',hypothesisId:'A',location:'lobbyController.js:handleGameReady',message:'ready popup inputs',data:{readyMin,walletBalance,walletType:walletBalance==null?'null':typeof walletBalance,gameStake:game?.stake??game?.Stake??null,gameBuyIn:game?.buyIn??game?.BuyIn??null},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f6f1a9'},body:JSON.stringify({sessionId:'f6f1a9',hypothesisId:'A',location:'lobbyController.js:handleGameReady',message:'ready popup inputs',data:{readyMin,walletBalance,walletType:walletBalance==null?'null':typeof walletBalance,gameStake:game?.stake??game?.Stake??null,gameBet:game?.bet??game?.Bet??null},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
   showSeatsFilledPopup({ min: readyMin, balance: walletBalance });
   refreshGames({ keepError: true });
@@ -361,7 +361,7 @@ async function handleTableStarted(payload) {
   }
   const started = readTableStarted(payload, gameId);
   if (buyIn != null && Number.isFinite(buyIn)) {
-    started.buyIn = buyIn;
+    started.bet = buyIn;
   }
   await enterGame(started);
 }
