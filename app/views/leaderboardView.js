@@ -26,15 +26,14 @@ export function setLeaderboardLoading(loading) {
   });
   if (loading) {
     els.summary.textContent = "";
-    els.body.innerHTML =
-      '<tr><td colspan="3" class="text-muted">Loading leaderboard…</td></tr>';
+    els.body.innerHTML = '<p class="lb-empty">Loading leaderboard…</p>';
   }
 }
 
 export function clearLeaderboardResults(message) {
   els.summary.textContent = "";
   els.pages.innerHTML = "";
-  els.body.innerHTML = `<tr><td colspan="3" class="text-muted">${escapeHtml(message)}</td></tr>`;
+  els.body.innerHTML = `<p class="lb-empty">${escapeHtml(message)}</p>`;
 }
 
 export function renderLeaderboard({ page, totalCount, players, pageCount }) {
@@ -44,21 +43,49 @@ export function renderLeaderboard({ page, totalCount, players, pageCount }) {
     : countLabel;
 
   if (!players.length) {
-    els.body.innerHTML =
-      '<tr><td colspan="3" class="text-muted">No ranked players yet.</td></tr>';
+    els.body.innerHTML = '<p class="lb-empty">No ranked players yet.</p>';
   } else {
-    els.body.innerHTML = players
-      .map(
-        (player) => `<tr>
-          <td>${player.rank}</td>
-          <td>${escapeHtml(player.userId)}</td>
-          <td class="text-end">${player.totalWins}</td>
-        </tr>`
-      )
-      .join("");
+    const you = document.getElementById("signed-in-user")?.textContent?.trim() ?? "";
+    els.body.innerHTML = players.map((player) => rowMarkup(player, player.userId === you)).join("");
   }
 
   renderPages(page, pageCount);
+}
+
+const STAR_PATH = "M12 1.4 14.9 8.1l7.1.3-5.6 4.5 1.9 6.9L12 16.1 5.7 19.8 7.6 12.9 2 8.4l7.1-.3z";
+
+function rowMarkup(player, isYou) {
+  const hue = avatarHue(player.userId);
+  const name = isYou ? "You" : escapeHtml(player.userId);
+  return `<article class="lb-row${isYou ? " lb-row-you" : ""}">
+    ${rankBadge(player.rank)}
+    <div class="lb-avatar" style="--lb-hue:${hue}" aria-hidden="true">${initial(player.userId)}</div>
+    <div class="lb-name" title="${escapeHtml(player.userId)}">${name}</div>
+    <div class="lb-score"><span>${formatScore(player.totalWins)}</span><span class="lb-coin" aria-hidden="true"></span></div>
+  </article>`;
+}
+
+function rankBadge(rank) {
+  if (rank >= 1 && rank <= 3) {
+    const tone = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
+    return `<span class="lb-medal lb-medal-${tone}"><svg viewBox="0 0 24 22" aria-hidden="true"><path d="${STAR_PATH}"></path></svg><span>${rank}</span></span>`;
+  }
+  return `<span class="lb-place">${rank}</span>`;
+}
+
+function avatarHue(userId) {
+  const hues = [268, 210, 330, 152, 28, 190];
+  const code = String(userId).charCodeAt(0) || 0;
+  return hues[code % hues.length];
+}
+
+function initial(userId) {
+  const char = String(userId).trim().charAt(0).toUpperCase();
+  return escapeHtml(char || "?");
+}
+
+function formatScore(value) {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
 function renderPages(page, pageCount) {
@@ -107,5 +134,8 @@ export function bindLeaderboardView({ onPage }) {
       return;
     }
     onPage(Number(button.dataset.page));
+  });
+  document.getElementById("leaderboard-cancel")?.addEventListener("click", () => {
+    document.getElementById("lobby-nav-btn")?.click();
   });
 }

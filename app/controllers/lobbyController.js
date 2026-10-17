@@ -17,11 +17,14 @@ import {
   readCreateGameForm,
   renderLobbyGames,
   setJoinBusy,
+  closeTopUpPage,
   hideTopUpPopup,
   hideTopUpWaiting,
+  isTopUpPageOpen,
   readTopUpAmount,
   readWalletAction,
   renderWalletBalance,
+  showTopUpPageStatus,
   setCreateBusy,
   setTopUpBusy,
   showTopUpError,
@@ -32,6 +35,7 @@ import {
   showLobbyError,
   showSeatsFilledPopup,
   showReadyWaiting,
+  readReadyBuyIn,
   whenTopUpHidden,
   whenTopUpWaitingHidden,
   whenTopUpWaitingShown,
@@ -55,27 +59,35 @@ let pollId = null;
 let bound = false;
 let lastReadyGameId = "";
 let listedGames = [];
+let walletBalance = null;
+let readyBuyIn = null;
 
 function readBalance(payload) {
   const balance = payload?.balance ?? payload?.Balance;
   return balance == null ? null : balance;
 }
 
+function rememberBalance(balance) {
+  walletBalance = balance == null || balance === "" ? null : balance;
+  renderWalletBalance(walletBalance);
+}
+
 async function refreshBalance() {
   try {
     const payload = await getWalletBalance();
-    renderWalletBalance(readBalance(payload));
+    rememberBalance(readBalance(payload));
   } catch (error) {
     if (isSessionExpiredError(error)) {
       return;
     }
-    renderWalletBalance(null);
+    rememberBalance(null);
   }
 }
 
 async function handleTopUp() {
   const amount = readTopUpAmount();
   const withdraw = readWalletAction() === "withdraw";
+  const fromPage = isTopUpPageOpen();
   if (!Number.isInteger(amount) || amount < 10 || amount > 1000) {
     showTopUpError("Enter an amount from RM 10 to RM 1,000.");
     return;
@@ -83,7 +95,10 @@ async function handleTopUp() {
 
   setTopUpBusy(true);
   showTopUpError("");
-  if (!withdraw) {
+  if (fromPage) {
+    showTopUpPageStatus("");
+  }
+  if (!withdraw && !fromPage) {
     keepPendingJoin();
     showTopUpWaiting();
     await whenTopUpHidden();
@@ -92,7 +107,7 @@ async function handleTopUp() {
   try {
     const payload = withdraw ? await withdrawWallet(amount) : await topUpWallet(amount);
     const balance = readBalance(payload);
-    renderWalletBalance(balance);
+    rememberBalance(balance);
     if (balance != null) {
       setWalletDisplay(balance);
     }
@@ -102,7 +117,10 @@ async function handleTopUp() {
     hideTopUpWaiting();
     await hidden;
     await waitingHidden;
-    if (!withdraw) {
+    if (fromPage && !withdraw) {
+      closeTopUpPage();
+    }
+    if (!withdraw && !fromPage) {
       await resumePendingJoin();
     }
   } catch (error) {
@@ -112,7 +130,7 @@ async function handleTopUp() {
     }
     const message =
       error.message === "Failed to fetch" ? "Could not reach the game engine." : error.message;
-    if (!withdraw) {
+    if (!withdraw && !fromPage) {
       showTopUpPopup(message);
     } else {
       showTopUpError(message);
@@ -232,13 +250,19 @@ function buyInForReady(game) {
   return readAmount(listed?.buyIn ?? listed?.BuyIn ?? listed?.stake ?? listed?.Stake);
 }
 
-function handleGameReady(game) {
+async function handleGameReady(game) {
   const gameId = game?.gameId ?? game?.GameId ?? "";
   if (gameId && gameId === lastReadyGameId) {
     return;
   }
   lastReadyGameId = gameId;
-  showSeatsFilledPopup(buyInForReady(game));
+  readyBuyIn = null;
+  await refreshBalance();
+  const readyMin = buyInForReady(game);
+  // #region agent log
+  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f6f1a9'},body:JSON.stringify({sessionId:'f6f1a9',hypothesisId:'A',location:'lobbyController.js:handleGameReady',message:'ready popup inputs',data:{readyMin,walletBalance,walletType:walletBalance==null?'null':typeof walletBalance,gameStake:game?.stake??game?.Stake??null,gameBuyIn:game?.buyIn??game?.BuyIn??null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  showSeatsFilledPopup({ min: readyMin, balance: walletBalance });
   refreshGames({ keepError: true });
 }
 
@@ -249,6 +273,7 @@ async function handleReadyStart() {
     return;
   }
 
+  readyBuyIn = readReadyBuyIn();
   setReadyBusy(true);
   showLobbyError("");
   try {
@@ -324,6 +349,8 @@ export function closeLobbyForGame() {
 
 async function handleTableStarted(payload) {
   const gameId = readGameId(payload) || lastReadyGameId;
+  const buyIn = readyBuyIn;
+  readyBuyIn = null;
   hideSeatsFilledPopup();
   lastReadyGameId = "";
   leaveLeaderboard();
@@ -332,11 +359,16 @@ async function handleTableStarted(payload) {
     showLobbyError("Table started, but no gameId was provided.");
     return;
   }
-  await enterGame(readTableStarted(payload, gameId));
+  const started = readTableStarted(payload, gameId);
+  if (buyIn != null && Number.isFinite(buyIn)) {
+    started.buyIn = buyIn;
+  }
+  await enterGame(started);
 }
 
 async function handleReadyCancel() {
   const gameId = lastReadyGameId;
+  readyBuyIn = null;
   setReadyBusy(true);
   showLobbyError("");
   try {

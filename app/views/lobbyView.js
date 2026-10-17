@@ -21,6 +21,7 @@ const els = {
   topUpAmount: document.getElementById("topup-amount"),
   topUpError: document.getElementById("topup-error"),
   topUpSubmitBtn: document.getElementById("topup-submit-btn"),
+  topUpPageStatus: document.getElementById("topup-page-status"),
   topUpWaitingModal: document.getElementById("topup-waiting-modal"),
   form: document.getElementById("create-game-form"),
   playerCount: document.getElementById("create-player-count"),
@@ -38,6 +39,12 @@ const els = {
   lobbyNav: document.getElementById("lobby-nav-btn"),
   readyModal: document.getElementById("lobby-ready-modal"),
   readyTitle: document.getElementById("lobby-ready-title"),
+  readyBalance: document.getElementById("lobby-ready-balance"),
+  readyControls: document.getElementById("lobby-ready-controls"),
+  readyAmount: document.getElementById("lobby-ready-amount"),
+  readyMin: document.getElementById("lobby-ready-min"),
+  readyMax: document.getElementById("lobby-ready-max"),
+  readySlider: document.getElementById("lobby-ready-slider"),
   readyBody: document.getElementById("lobby-ready-body"),
   readyCancelBtn: document.getElementById("lobby-ready-cancel-btn"),
   readyStartBtn: document.getElementById("lobby-ready-start-btn"),
@@ -45,19 +52,38 @@ const els = {
 };
 
 const READY_COPY = {
-  title: "Game ready",
-  body: "All seats are filled. Buy in to start, or cancel to leave your seat.",
+  title: "Join this table",
   waitingTitle: "Waiting",
   waitingBody: "Waiting other players...",
 };
 
-function readyBody(buyIn) {
-  if (buyIn == null || buyIn === "") {
-    return READY_COPY.body;
+function readReadyAmount(value) {
+  if (value == null || value === "") {
+    return null;
   }
-  const amount = Number(buyIn);
-  const label = Number.isFinite(amount) ? String(amount) : String(buyIn);
-  return `All seats are filled. The buy-in is RM ${label}. Buy in to start, or cancel to leave your seat.`;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function moneyLabel(amount) {
+  const value = readReadyAmount(amount);
+  return value == null ? "—" : `${currency} ${value}`;
+}
+
+function renderReadyAmount(amount) {
+  if (els.readyAmount) {
+    els.readyAmount.textContent = moneyLabel(amount);
+  }
+  const slider = els.readySlider;
+  if (!slider) {
+    return;
+  }
+  const min = Number(slider.min);
+  const max = Number(slider.max);
+  const current = Number(amount);
+  const ratio =
+    max > min && Number.isFinite(current) ? (current - min) / (max - min) : max === min ? 1 : 0;
+  slider.style.setProperty("--ready-fill", `${Math.min(1, Math.max(0, ratio)) * 100}%`);
 }
 
 let readyModal = null;
@@ -83,6 +109,9 @@ function walletTopUpWaitingModal() {
 }
 
 function lobbyReadyModal() {
+  if (els.readyModal && els.readyModal.parentElement !== document.body) {
+    document.body.appendChild(els.readyModal);
+  }
   if (!readyModal && els.readyModal) {
     readyModal = new bootstrap.Modal(els.readyModal);
   }
@@ -208,12 +237,45 @@ export function readTopUpAmount() {
 export function showTopUpError(message) {
   els.topUpError.textContent = message;
   els.topUpError.classList.toggle("d-none", !message);
+  if (isTopUpPageOpen()) {
+    showTopUpPageStatus(message, true);
+  }
+}
+
+export function showTopUpPageStatus(message, isError = false) {
+  const status = els.topUpPageStatus;
+  if (!status) {
+    return;
+  }
+  status.textContent = message || "";
+  status.hidden = !message;
+  status.classList.toggle("is-error", Boolean(isError && message));
+}
+
+export function isTopUpPageOpen() {
+  return Boolean(els.topUpScreen && !els.topUpScreen.hidden);
 }
 
 export function setTopUpBusy(busy) {
   els.topUpSubmitBtn.disabled = busy;
   els.topUpAmount.disabled = busy;
   els.walletAction.disabled = busy;
+  if (els.topUpSwipeKnob) {
+    els.topUpSwipeKnob.disabled = busy;
+  }
+  els.topUpChips.forEach((chip) => {
+    chip.disabled = busy;
+  });
+  if (busy) {
+    if (els.topUpMinus) {
+      els.topUpMinus.disabled = true;
+    }
+    if (els.topUpPlus) {
+      els.topUpPlus.disabled = true;
+    }
+    return;
+  }
+  renderTopUpAmount(pageAmount());
 }
 
 export function showLobbyError(message) {
@@ -300,26 +362,76 @@ export function renderLobbyGames(games) {
     .join("");
 }
 
-function resetReadyPopup() {
+function setReadyMode(waiting) {
   if (els.readyTitle) {
-    els.readyTitle.textContent = READY_COPY.title;
+    els.readyTitle.textContent = waiting ? READY_COPY.waitingTitle : READY_COPY.title;
+  }
+  if (els.readyControls) {
+    els.readyControls.hidden = waiting;
   }
   if (els.readyBody) {
-    els.readyBody.textContent = READY_COPY.body;
+    els.readyBody.hidden = !waiting;
+    if (waiting) {
+      els.readyBody.textContent = READY_COPY.waitingBody;
+    }
   }
   if (els.readyStartBtn) {
-    els.readyStartBtn.hidden = false;
+    els.readyStartBtn.hidden = waiting;
     els.readyStartBtn.textContent = "Buy in";
   }
+  if (els.readyCancelBtn) {
+    els.readyCancelBtn.disabled = false;
+  }
+  if (els.readyCloseBtn) {
+    els.readyCloseBtn.disabled = false;
+  }
+  if (els.readySlider) {
+    els.readySlider.disabled = waiting;
+  }
+}
+
+function applyReadyRange(min, balance) {
+  const floor = readReadyAmount(min) ?? 0;
+  const wallet = readReadyAmount(balance);
+  const ceiling = wallet == null || wallet < floor ? floor : wallet;
+  if (els.readySlider) {
+    els.readySlider.min = String(floor);
+    els.readySlider.max = String(ceiling);
+    els.readySlider.step = "1";
+    els.readySlider.value = String(floor);
+  }
+  if (els.readyMin) {
+    els.readyMin.textContent = moneyLabel(floor);
+  }
+  if (els.readyMax) {
+    els.readyMax.textContent = moneyLabel(ceiling);
+  }
+  if (els.readyBalance) {
+    els.readyBalance.textContent =
+      wallet == null ? "Your balance: —" : `Your balance: ${moneyLabel(wallet)}`;
+  }
+  renderReadyAmount(floor);
+  // #region agent log
+  const slider = els.readySlider;
+  const rect = slider?.getBoundingClientRect();
+  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f6f1a9'},body:JSON.stringify({sessionId:'f6f1a9',hypothesisId:'A',location:'lobbyView.js:applyReadyRange',message:'slider range applied',data:{minArg:min,balanceArg:balance,balanceType:balance==null?'null':typeof balance,floor,wallet,ceiling,disabled:Boolean(slider?.disabled),width:rect?Math.round(rect.width):null,height:rect?Math.round(rect.height):null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+}
+
+function resetReadyPopup() {
+  setReadyMode(false);
   setReadyBusy(false);
 }
 
-export function showSeatsFilledPopup(buyIn) {
+export function showSeatsFilledPopup(options) {
+  const source = options != null && typeof options === "object" ? options : { min: options };
+  applyReadyRange(source.min, source.balance);
   resetReadyPopup();
-  if (els.readyBody) {
-    els.readyBody.textContent = readyBody(buyIn);
-  }
   lobbyReadyModal()?.show();
+}
+
+export function readReadyBuyIn() {
+  return readReadyAmount(els.readySlider?.value) ?? readReadyAmount(els.readySlider?.min) ?? 0;
 }
 
 export function hideSeatsFilledPopup() {
@@ -331,25 +443,19 @@ export function setReadyBusy(busy) {
   if (els.readyCancelBtn) {
     els.readyCancelBtn.disabled = busy;
   }
-  if (els.readyStartBtn) {
+  if (els.readyCloseBtn) {
+    els.readyCloseBtn.disabled = busy;
+  }
+  if (els.readyStartBtn && !els.readyStartBtn.hidden) {
     els.readyStartBtn.disabled = busy;
+  }
+  if (els.readySlider && !els.readyControls?.hidden) {
+    els.readySlider.disabled = busy;
   }
 }
 
 export function showReadyWaiting() {
-  if (els.readyTitle) {
-    els.readyTitle.textContent = READY_COPY.waitingTitle;
-  }
-  if (els.readyBody) {
-    els.readyBody.textContent = READY_COPY.waitingBody;
-  }
-  if (els.readyStartBtn) {
-    els.readyStartBtn.hidden = true;
-    els.readyStartBtn.disabled = true;
-  }
-  if (els.readyCancelBtn) {
-    els.readyCancelBtn.disabled = false;
-  }
+  setReadyMode(true);
 }
 
 const TOPUP_MIN = 10;
@@ -433,6 +539,7 @@ function showTopUpPage() {
   els.walletAction.value = "topup";
   applyWalletAction();
   renderTopUpAmount(pageAmount());
+  showTopUpPageStatus("");
   resetSwipe();
   els.topUpScreen.hidden = false;
   els.screen.hidden = true;
@@ -451,7 +558,11 @@ function backFromTopUp() {
   els.screen.hidden = false;
 }
 
-function bindTopUpSwipe() {
+export function closeTopUpPage() {
+  backFromTopUp();
+}
+
+function bindTopUpSwipe(onTopUp) {
   const knob = els.topUpSwipeKnob;
   if (!knob) {
     return;
@@ -460,13 +571,17 @@ function bindTopUpSwipe() {
   let origin = 0;
 
   knob.addEventListener("pointerdown", (event) => {
-    if (els.topUpSubmitBtn.disabled) {
+    if (knob.disabled || els.topUpSubmitBtn.disabled) {
       return;
     }
     swipeDragging = true;
     startX = event.clientX;
     origin = swipeOffset;
-    knob.setPointerCapture(event.pointerId);
+    try {
+      knob.setPointerCapture(event.pointerId);
+    } catch {
+      // Capture is optional; the knob still follows the pointer.
+    }
     setSwipeOffset(swipeOffset, false);
   });
   knob.addEventListener("pointermove", (event) => {
@@ -483,7 +598,7 @@ function bindTopUpSwipe() {
     const completed = swipeOffset >= swipeMax() * 0.85 && swipeMax() > 0;
     resetSwipe();
     if (completed) {
-      els.topUpForm.requestSubmit();
+      onTopUp?.();
     }
   };
   knob.addEventListener("pointerup", finishSwipe);
@@ -523,7 +638,7 @@ export function bindLobbyView({
   els.topUpChips.forEach((chip) => {
     chip.addEventListener("click", () => writeTopUpAmount(Number(chip.dataset.amount)));
   });
-  bindTopUpSwipe();
+  bindTopUpSwipe(onTopUp);
   els.walletAction.addEventListener("change", () => {
     showTopUpError("");
     applyWalletAction();
@@ -548,4 +663,18 @@ export function bindLobbyView({
   els.readyCancelBtn?.addEventListener("click", () => onReadyCancel?.());
   els.readyCloseBtn?.addEventListener("click", () => onReadyCancel?.());
   els.readyStartBtn?.addEventListener("click", () => onReadyStart?.());
+  els.readySlider?.addEventListener("input", () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f6f1a9'},body:JSON.stringify({sessionId:'f6f1a9',hypothesisId:'D',location:'lobbyView.js:slider-input',message:'slider input',data:{value:els.readySlider.value,min:els.readySlider.min,max:els.readySlider.max,disabled:els.readySlider.disabled},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    renderReadyAmount(els.readySlider.value);
+  });
+  els.readyModal?.addEventListener("pointerdown", (event) => {
+    const target = event.target;
+    const slider = els.readySlider;
+    const sliderRect = slider?.getBoundingClientRect();
+    // #region agent log
+    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f6f1a9'},body:JSON.stringify({sessionId:'f6f1a9',hypothesisId:'C',location:'lobbyView.js:pointerdown',message:'pointer down in ready sheet',data:{tag:target?.tagName,id:target?.id||'',className:typeof target?.className==='string'?target.className:'',sliderDisabled:Boolean(slider?.disabled),min:slider?.min,max:slider?.max,clientX:event.clientX,sliderLeft:sliderRect?Math.round(sliderRect.left):null,sliderRight:sliderRect?Math.round(sliderRect.right):null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, true);
 }
