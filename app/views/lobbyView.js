@@ -27,6 +27,10 @@ const els = {
   playerCount: document.getElementById("create-player-count"),
   turnTime: document.getElementById("create-turn-time"),
   stake: document.getElementById("create-stake"),
+  stack: document.getElementById("create-stack"),
+  stackAmount: document.getElementById("create-stack-amount"),
+  stackMin: document.getElementById("create-stack-min"),
+  stackMax: document.getElementById("create-stack-max"),
   error: document.getElementById("lobby-error"),
   createBtn: document.getElementById("create-game-btn"),
   refreshBtn: document.getElementById("refresh-lobby-btn"),
@@ -68,6 +72,60 @@ function readReadyAmount(value) {
 function moneyLabel(amount) {
   const value = readReadyAmount(amount);
   return value == null ? "—" : `${currency} ${value}`;
+}
+
+let createStackTouched = false;
+let knownWalletBalance = null;
+let readyBalanceLabel = "Your balance: —";
+
+function stakeFloor() {
+  const stake = Number(els.stake?.value);
+  return Number.isFinite(stake) && stake > 0 ? stake : 10;
+}
+
+function renderCreateStack(amount) {
+  if (els.stackAmount) {
+    els.stackAmount.textContent = moneyLabel(amount);
+  }
+  const slider = els.stack;
+  if (!slider) {
+    return;
+  }
+  const min = Number(slider.min);
+  const max = Number(slider.max);
+  const current = Number(amount);
+  const ratio =
+    max > min && Number.isFinite(current) ? (current - min) / (max - min) : 1;
+  slider.style.setProperty("--stack-fill", `${Math.min(1, Math.max(0, ratio)) * 100}%`);
+}
+
+function applyCreateStackRange(balance) {
+  const slider = els.stack;
+  if (!slider) {
+    return;
+  }
+  const floor = stakeFloor();
+  const wallet = readReadyAmount(balance);
+  const ceiling = wallet == null || wallet < floor ? floor : Math.floor(wallet);
+  const previous = Number(slider.value);
+  let next = createStackTouched && Number.isFinite(previous) ? previous : floor;
+  if (next < floor) {
+    next = floor;
+  }
+  if (next > ceiling) {
+    next = ceiling;
+  }
+  slider.min = String(floor);
+  slider.max = String(ceiling);
+  slider.step = "1";
+  slider.value = String(Math.round(next));
+  if (els.stackMin) {
+    els.stackMin.textContent = String(floor);
+  }
+  if (els.stackMax) {
+    els.stackMax.textContent = String(ceiling);
+  }
+  renderCreateStack(slider.value);
 }
 
 function renderReadyAmount(amount) {
@@ -145,8 +203,10 @@ export function hideLobby() {
 }
 
 export function renderWalletBalance(balance) {
+  knownWalletBalance = balance == null || balance === "" ? null : balance;
   els.walletBalance.textContent =
-    balance == null || balance === "" ? "—" : String(balance);
+    knownWalletBalance == null ? "—" : String(knownWalletBalance);
+  applyCreateStackRange(knownWalletBalance);
 }
 
 function applyWalletAction() {
@@ -285,6 +345,9 @@ export function showLobbyError(message) {
 
 export function setCreateBusy(busy) {
   els.createBtn.disabled = busy;
+  if (els.stack) {
+    els.stack.disabled = busy;
+  }
 }
 
 export function readCreateGameForm() {
@@ -292,6 +355,7 @@ export function readCreateGameForm() {
     playerCount: Number(els.playerCount.value),
     turnTime: Number(els.turnTime.value),
     stake: Number(els.stake.value),
+    stack: Math.round(Number(els.stack?.value)),
   };
 }
 
@@ -406,16 +470,13 @@ function applyReadyRange(min, balance) {
   if (els.readyMax) {
     els.readyMax.textContent = moneyLabel(ceiling);
   }
+  readyBalanceLabel =
+    wallet == null ? "Your balance: —" : `Your balance: ${moneyLabel(wallet)}`;
   if (els.readyBalance) {
-    els.readyBalance.textContent =
-      wallet == null ? "Your balance: —" : `Your balance: ${moneyLabel(wallet)}`;
+    els.readyBalance.textContent = readyBalanceLabel;
+    els.readyBalance.classList.remove("is-alert");
   }
   renderReadyAmount(floor);
-  // #region agent log
-  const slider = els.readySlider;
-  const rect = slider?.getBoundingClientRect();
-  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f6f1a9'},body:JSON.stringify({sessionId:'f6f1a9',hypothesisId:'A',location:'lobbyView.js:applyReadyRange',message:'slider range applied',data:{minArg:min,balanceArg:balance,balanceType:balance==null?'null':typeof balance,floor,wallet,ceiling,disabled:Boolean(slider?.disabled),width:rect?Math.round(rect.width):null,height:rect?Math.round(rect.height):null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 }
 
 function resetReadyPopup() {
@@ -432,6 +493,14 @@ export function showSeatsFilledPopup(options) {
 
 export function readReadyBuyIn() {
   return readReadyAmount(els.readySlider?.value) ?? readReadyAmount(els.readySlider?.min) ?? 0;
+}
+
+export function showReadyNotice(message) {
+  if (!els.readyBalance) {
+    return;
+  }
+  els.readyBalance.textContent = message || readyBalanceLabel;
+  els.readyBalance.classList.toggle("is-alert", Boolean(message));
 }
 
 export function hideSeatsFilledPopup() {
@@ -619,6 +688,14 @@ export function bindLobbyView({
     event.preventDefault();
     onCreate();
   });
+  els.stake?.addEventListener("change", () => {
+    applyCreateStackRange(knownWalletBalance);
+  });
+  els.stack?.addEventListener("input", () => {
+    createStackTouched = true;
+    renderCreateStack(els.stack.value);
+  });
+  applyCreateStackRange(knownWalletBalance);
   els.gearBtn?.addEventListener("click", (event) => {
     event.stopPropagation();
     setGearOpen(els.gearMenu.hidden);
@@ -664,17 +741,6 @@ export function bindLobbyView({
   els.readyCloseBtn?.addEventListener("click", () => onReadyCancel?.());
   els.readyStartBtn?.addEventListener("click", () => onReadyStart?.());
   els.readySlider?.addEventListener("input", () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f6f1a9'},body:JSON.stringify({sessionId:'f6f1a9',hypothesisId:'D',location:'lobbyView.js:slider-input',message:'slider input',data:{value:els.readySlider.value,min:els.readySlider.min,max:els.readySlider.max,disabled:els.readySlider.disabled},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     renderReadyAmount(els.readySlider.value);
   });
-  els.readyModal?.addEventListener("pointerdown", (event) => {
-    const target = event.target;
-    const slider = els.readySlider;
-    const sliderRect = slider?.getBoundingClientRect();
-    // #region agent log
-    fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f6f1a9'},body:JSON.stringify({sessionId:'f6f1a9',hypothesisId:'C',location:'lobbyView.js:pointerdown',message:'pointer down in ready sheet',data:{tag:target?.tagName,id:target?.id||'',className:typeof target?.className==='string'?target.className:'',sliderDisabled:Boolean(slider?.disabled),min:slider?.min,max:slider?.max,clientX:event.clientX,sliderLeft:sliderRect?Math.round(sliderRect.left):null,sliderRight:sliderRect?Math.round(sliderRect.right):null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }, true);
 }

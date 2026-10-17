@@ -2,6 +2,7 @@ import {
   createLobbyGame,
   getWalletBalance,
   isSessionExpiredError,
+  joinGame,
   topUpWallet,
   withdrawWallet,
   leaveLobbyGame,
@@ -10,6 +11,7 @@ import {
   sendPlayerResponse,
   subscribeLobbyNotifications,
 } from "../services/apiService.js";
+import { localPlayerId } from "../models/gameModel.js";
 import {
   bindLobbyView,
   hideLobby,
@@ -35,6 +37,7 @@ import {
   showLobbyError,
   showSeatsFilledPopup,
   showReadyWaiting,
+  showReadyNotice,
   readReadyBuyIn,
   whenTopUpHidden,
   whenTopUpWaitingHidden,
@@ -61,6 +64,10 @@ let lastReadyGameId = "";
 let listedGames = [];
 let walletBalance = null;
 let readyBuyIn = null;
+let joinedFromBuyIn = "";
+let createdTable = null;
+
+const INSUFFICIENT_WALLET_CODE = 2;
 
 function readBalance(payload) {
   const balance = payload?.balance ?? payload?.Balance;
@@ -174,7 +181,22 @@ async function handleCreate() {
     showLobbyError("Stake must be 10, 30, or 50.");
     return;
   }
+  const balanceCap = readAmount(walletBalance);
+  if (!Number.isInteger(body.stack) || body.stack < body.stake) {
+    showLobbyError("Stack must be at least the stake.");
+    return;
+  }
+  if (balanceCap != null && body.stack > balanceCap) {
+    showLobbyError("Stack cannot be more than your balance.");
+    return;
+  }
 
+  createdTable = {
+    players: body.playerCount,
+    turnTime: body.turnTime,
+    stake: body.stake,
+    stack: body.stack,
+  };
   setCreateBusy(true);
   showLobbyError("");
   try {
@@ -257,11 +279,9 @@ async function handleGameReady(game) {
   }
   lastReadyGameId = gameId;
   readyBuyIn = null;
+  joinedFromBuyIn = "";
   await refreshBalance();
   const readyMin = buyInForReady(game);
-  // #region agent log
-  fetch('http://127.0.0.1:7763/ingest/0448d2d9-8835-4aeb-9ebf-675bd52a3444',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f6f1a9'},body:JSON.stringify({sessionId:'f6f1a9',hypothesisId:'A',location:'lobbyController.js:handleGameReady',message:'ready popup inputs',data:{readyMin,walletBalance,walletType:walletBalance==null?'null':typeof walletBalance,gameStake:game?.stake??game?.Stake??null,gameBet:game?.bet??game?.Bet??null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   showSeatsFilledPopup({ min: readyMin, balance: walletBalance });
   refreshGames({ keepError: true });
 }
@@ -276,14 +296,38 @@ async function handleReadyStart() {
   readyBuyIn = readReadyBuyIn();
   setReadyBusy(true);
   showLobbyError("");
+  showReadyNotice("");
+  let joined = false;
   try {
+    const result = await joinGame({
+      gameId,
+      playerId: localPlayerId(),
+      bet: createdTable?.stake,
+      stack: readyBuyIn,
+    });
+    const code = Number(result?.code ?? result?.Code);
+    if (code === INSUFFICIENT_WALLET_CODE) {
+      const message = Number.isFinite(readyBuyIn)
+        ? `Not enough balance for the RM ${readyBuyIn} buy-in. Top up your wallet to join the game.`
+        : "Not enough balance to buy in. Top up your wallet to join the game.";
+      showReadyNotice(message);
+      showLobbyError(message);
+      setReadyBusy(false);
+      return;
+    }
+    joined = true;
+    joinedFromBuyIn = String(gameId);
     await sendPlayerResponse(gameId, PLAYER_RESPONSE_START);
     showReadyWaiting();
   } catch (error) {
+    if (!joined) {
+      joinedFromBuyIn = "";
+    }
     if (!isSessionExpiredError(error)) {
-      showLobbyError(
-        error.message === "Failed to fetch" ? "Could not reach the game engine." : error.message
-      );
+      const message =
+        error.message === "Failed to fetch" ? "Could not reach the game engine." : error.message;
+      showReadyNotice(message);
+      showLobbyError(message);
     }
     setReadyBusy(false);
   }
@@ -349,8 +393,10 @@ export function closeLobbyForGame() {
 
 async function handleTableStarted(payload) {
   const gameId = readGameId(payload) || lastReadyGameId;
+  const started = readTableStarted(payload, gameId);
   const buyIn = readyBuyIn;
   readyBuyIn = null;
+  joinedFromBuyIn = "";
   hideSeatsFilledPopup();
   lastReadyGameId = "";
   leaveLeaderboard();
@@ -359,16 +405,17 @@ async function handleTableStarted(payload) {
     showLobbyError("Table started, but no gameId was provided.");
     return;
   }
-  const started = readTableStarted(payload, gameId);
   if (buyIn != null && Number.isFinite(buyIn)) {
     started.bet = buyIn;
+    started.stack = buyIn;
   }
-  await enterGame(started);
+  await enterGame(started, { skipJoin: true });
 }
 
 async function handleReadyCancel() {
   const gameId = lastReadyGameId;
   readyBuyIn = null;
+  joinedFromBuyIn = "";
   setReadyBusy(true);
   showLobbyError("");
   try {

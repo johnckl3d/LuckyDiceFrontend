@@ -361,8 +361,15 @@ export async function leaveLobbyGame(gameId) {
   return invoke("lobby", "/hubs/lobby", "LeaveGame", [gameId], true);
 }
 
-export async function joinGame({ gameId, playerId, bet }) {
-  return invoke("game", "/hubs/game", "joinGame", [{ gameId, playerId, bet }], true);
+export async function joinGame({ gameId, playerId, bet, stack }) {
+  const body = { gameId, playerId };
+  if (bet != null) {
+    body.bet = bet;
+  }
+  if (stack != null) {
+    body.stack = stack;
+  }
+  return invoke("game", "/hubs/game", "joinGame", [body], true);
 }
 
 export async function startGame(players) {

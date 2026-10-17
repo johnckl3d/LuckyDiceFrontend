@@ -1553,11 +1553,17 @@ function readResultCode(result) {
 }
 
 function joinArgs(started, gameId) {
-  return {
+  const bet = started?.bet ?? started?.Bet ?? started?.stake ?? started?.Stake ?? state.stake;
+  const args = {
     gameId,
     playerId: localPlayerId(),
-    bet: started?.bet ?? started?.Bet ?? started?.stake ?? started?.Stake ?? state.stake,
+    bet,
   };
+  const stack = started?.stack ?? started?.Stack;
+  if (stack != null && stack !== "") {
+    args.stack = stack;
+  }
+  return args;
 }
 
 function topUpMessage(buyIn) {
@@ -1660,7 +1666,7 @@ export async function resumePendingJoin() {
   }
 }
 
-export async function enterGame(started) {
+export async function enterGame(started, options = {}) {
   if (!gameReady) {
     bindGameView({
       onDieClick,
@@ -1709,6 +1715,10 @@ export async function enterGame(started) {
   }
 
   applyStartedGame({ ...started, gameId });
+  if (options.skipJoin) {
+    await presentJoinedGame();
+    return;
+  }
   joinInFlight = true;
   try {
     await joinTable({ ...started, gameId }, gameId);

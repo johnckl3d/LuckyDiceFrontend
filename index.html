@@ -210,6 +210,25 @@
                 <option value="50">50</option>
               </select>
             </div>
+            <div class="lobby-stack">
+              <div class="lobby-stack-head">
+                <label for="create-stack">Stack</label>
+                <strong id="create-stack-amount">10</strong>
+              </div>
+              <div class="lobby-stack-slider">
+                <span id="create-stack-min">10</span>
+                <input
+                  type="range"
+                  id="create-stack"
+                  min="10"
+                  max="10"
+                  step="1"
+                  value="10"
+                  aria-label="Stack"
+                />
+                <span id="create-stack-max">10</span>
+              </div>
+            </div>
             <div class="alert alert-danger d-none" id="lobby-error" role="alert"></div>
             <button type="submit" class="lobby-create" id="create-game-btn">Create game</button>
           </form>
