@@ -758,6 +758,8 @@ function walletAmountOf(entry) {
     return entry;
   }
   const amount = pick(entry, [
+    "stack",
+    "Stack",
     "balance",
     "Balance",
     "wallet",
@@ -884,6 +886,10 @@ function syncPlayerWallets() {
 
 function applyWalletBalancePayload(data) {
   const walletPayload = pick(data, [
+    "stacks",
+    "Stacks",
+    "stack",
+    "Stack",
     "walletBalance",
     "WalletBalance",
     "walletBalances",

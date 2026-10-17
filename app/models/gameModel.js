@@ -44,6 +44,8 @@ export function normalizePlayer(player) {
     wallet:
       player.wallet ??
       player.Wallet ??
+      player.stack ??
+      player.Stack ??
       player.balance ??
       player.Balance ??
       player.walletBalance ??
