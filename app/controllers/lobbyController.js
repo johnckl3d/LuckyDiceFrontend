@@ -2,7 +2,6 @@ import {
   createLobbyGame,
   getWalletBalance,
   isSessionExpiredError,
-  joinGame,
   topUpWallet,
   withdrawWallet,
   leaveLobbyGame,
@@ -11,7 +10,6 @@ import {
   sendPlayerResponse,
   subscribeLobbyNotifications,
 } from "../services/apiService.js";
-import { localPlayerId } from "../models/gameModel.js";
 import {
   bindLobbyView,
   hideLobby,
@@ -64,10 +62,7 @@ let lastReadyGameId = "";
 let listedGames = [];
 let walletBalance = null;
 let readyBuyIn = null;
-let joinedFromBuyIn = "";
 let createdTable = null;
-
-const INSUFFICIENT_WALLET_CODE = 2;
 
 function readBalance(payload) {
   const balance = payload?.balance ?? payload?.Balance;
@@ -279,7 +274,6 @@ async function handleGameReady(game) {
   }
   lastReadyGameId = gameId;
   readyBuyIn = null;
-  joinedFromBuyIn = "";
   await refreshBalance();
   const readyMin = buyInForReady(game);
   showSeatsFilledPopup({ min: readyMin, balance: walletBalance });
@@ -297,31 +291,15 @@ async function handleReadyStart() {
   setReadyBusy(true);
   showLobbyError("");
   showReadyNotice("");
-  let joined = false;
   try {
-    const result = await joinGame({
-      gameId,
-      playerId: localPlayerId(),
-      bet: createdTable?.stake,
-      stack: readyBuyIn,
-    });
-    const code = Number(result?.code ?? result?.Code);
-    if (code === INSUFFICIENT_WALLET_CODE) {
-      const message = Number.isFinite(readyBuyIn)
-        ? `Not enough balance for the RM ${readyBuyIn} buy-in. Top up your wallet to join the game.`
-        : "Not enough balance to buy in. Top up your wallet to join the game.";
-      showReadyNotice(message);
-      showLobbyError(message);
-      setReadyBusy(false);
+    await sendPlayerResponse(gameId, PLAYER_RESPONSE_START);
+    if (lastReadyGameId !== gameId) {
       return;
     }
-    joined = true;
-    joinedFromBuyIn = String(gameId);
-    await sendPlayerResponse(gameId, PLAYER_RESPONSE_START);
     showReadyWaiting();
   } catch (error) {
-    if (!joined) {
-      joinedFromBuyIn = "";
+    if (lastReadyGameId !== gameId) {
+      return;
     }
     if (!isSessionExpiredError(error)) {
       const message =
@@ -396,7 +374,6 @@ async function handleTableStarted(payload) {
   const started = readTableStarted(payload, gameId);
   const buyIn = readyBuyIn;
   readyBuyIn = null;
-  joinedFromBuyIn = "";
   hideSeatsFilledPopup();
   lastReadyGameId = "";
   leaveLeaderboard();
@@ -406,8 +383,10 @@ async function handleTableStarted(payload) {
     return;
   }
   if (buyIn != null && Number.isFinite(buyIn)) {
-    started.bet = buyIn;
+    started.bet = createdTable?.stake;
     started.stack = buyIn;
+    await enterGame(started);
+    return;
   }
   await enterGame(started, { skipJoin: true });
 }
@@ -415,7 +394,6 @@ async function handleTableStarted(payload) {
 async function handleReadyCancel() {
   const gameId = lastReadyGameId;
   readyBuyIn = null;
-  joinedFromBuyIn = "";
   setReadyBusy(true);
   showLobbyError("");
   try {

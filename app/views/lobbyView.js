@@ -54,7 +54,7 @@ const els = {
 const READY_COPY = {
   title: "Join this table",
   waitingTitle: "Waiting",
-  waitingBody: "Waiting other players...",
+  waitingBody: "Waiting for other players...",
 };
 
 function readReadyAmount(value) {
@@ -90,6 +90,7 @@ function renderReadyAmount(amount) {
 }
 
 let readyModal = null;
+let readyDismissLocked = false;
 let joiningGameId = "";
 let topUpModal = null;
 let topUpWaitingModal = null;
@@ -117,6 +118,11 @@ function lobbyReadyModal() {
   }
   if (!readyModal && els.readyModal) {
     readyModal = new bootstrap.Modal(els.readyModal);
+    els.readyModal.addEventListener("hide.bs.modal", (event) => {
+      if (readyDismissLocked) {
+        event.preventDefault();
+      }
+    });
   }
   return readyModal;
 }
@@ -373,7 +379,7 @@ function setReadyMode(waiting) {
     els.readyTitle.textContent = waiting ? READY_COPY.waitingTitle : READY_COPY.title;
   }
   if (els.readyControls) {
-    els.readyControls.hidden = waiting;
+    els.readyControls.hidden = false;
   }
   if (els.readyBody) {
     els.readyBody.hidden = !waiting;
@@ -382,14 +388,15 @@ function setReadyMode(waiting) {
     }
   }
   if (els.readyStartBtn) {
-    els.readyStartBtn.hidden = waiting;
+    els.readyStartBtn.hidden = false;
+    els.readyStartBtn.disabled = waiting;
     els.readyStartBtn.textContent = "Buy in";
   }
   if (els.readyCancelBtn) {
-    els.readyCancelBtn.disabled = false;
+    els.readyCancelBtn.disabled = waiting;
   }
   if (els.readyCloseBtn) {
-    els.readyCloseBtn.disabled = false;
+    els.readyCloseBtn.disabled = waiting;
   }
   if (els.readySlider) {
     els.readySlider.disabled = waiting;
@@ -422,6 +429,7 @@ function applyReadyRange(min, balance) {
 }
 
 function resetReadyPopup() {
+  readyDismissLocked = false;
   setReadyMode(false);
   setReadyBusy(false);
 }
@@ -446,6 +454,7 @@ export function showReadyNotice(message) {
 }
 
 export function hideSeatsFilledPopup() {
+  readyDismissLocked = false;
   lobbyReadyModal()?.hide();
   resetReadyPopup();
 }
@@ -466,6 +475,7 @@ export function setReadyBusy(busy) {
 }
 
 export function showReadyWaiting() {
+  readyDismissLocked = true;
   setReadyMode(true);
 }
 
