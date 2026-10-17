@@ -210,25 +210,6 @@
                 <option value="50">50</option>
               </select>
             </div>
-            <div class="lobby-stack">
-              <div class="lobby-stack-head">
-                <label for="create-stack">Stack</label>
-                <strong id="create-stack-amount">10</strong>
-              </div>
-              <div class="lobby-stack-slider">
-                <span id="create-stack-min">10</span>
-                <input
-                  type="range"
-                  id="create-stack"
-                  min="10"
-                  max="10"
-                  step="1"
-                  value="10"
-                  aria-label="Stack"
-                />
-                <span id="create-stack-max">10</span>
-              </div>
-            </div>
             <div class="alert alert-danger d-none" id="lobby-error" role="alert"></div>
             <button type="submit" class="lobby-create" id="create-game-btn">Create game</button>
           </form>
@@ -317,13 +298,14 @@
     </div>
 
     <div class="modal fade" id="wallet-topup-modal" tabindex="-1" aria-labelledby="wallet-topup-title" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+      <div class="modal-dialog modal-dialog-centered topup-wallet-dialog">
+        <div class="modal-content topup-wallet-sheet">
           <form id="wallet-topup-form" novalidate>
-            <div class="modal-header">
-              <h5 class="modal-title" id="wallet-topup-title">Top up wallet</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
+            <button type="button" class="topup-wallet-close" data-bs-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+            <img class="topup-wallet-art" src="assets/topup-wallet.png" alt="" />
+            <h5 class="modal-title" id="wallet-topup-title">Top up wallet</h5>
             <div class="modal-body">
               <label class="form-label" for="wallet-action">Action</label>
               <select class="form-select mb-3" id="wallet-action">
@@ -348,10 +330,10 @@
               <div class="alert alert-danger d-none mt-3 mb-0" id="topup-error" role="alert"></div>
             </div>
             <div class="modal-footer">
+              <button type="submit" class="btn btn-dark" id="topup-submit-btn">Top up</button>
               <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                 Cancel
               </button>
-              <button type="submit" class="btn btn-dark" id="topup-submit-btn">Top up</button>
             </div>
           </form>
         </div>

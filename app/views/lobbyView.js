@@ -27,10 +27,6 @@ const els = {
   playerCount: document.getElementById("create-player-count"),
   turnTime: document.getElementById("create-turn-time"),
   stake: document.getElementById("create-stake"),
-  stack: document.getElementById("create-stack"),
-  stackAmount: document.getElementById("create-stack-amount"),
-  stackMin: document.getElementById("create-stack-min"),
-  stackMax: document.getElementById("create-stack-max"),
   error: document.getElementById("lobby-error"),
   createBtn: document.getElementById("create-game-btn"),
   refreshBtn: document.getElementById("refresh-lobby-btn"),
@@ -74,59 +70,8 @@ function moneyLabel(amount) {
   return value == null ? "—" : `${currency} ${value}`;
 }
 
-let createStackTouched = false;
 let knownWalletBalance = null;
 let readyBalanceLabel = "Your balance: —";
-
-function stakeFloor() {
-  const stake = Number(els.stake?.value);
-  return Number.isFinite(stake) && stake > 0 ? stake : 10;
-}
-
-function renderCreateStack(amount) {
-  if (els.stackAmount) {
-    els.stackAmount.textContent = moneyLabel(amount);
-  }
-  const slider = els.stack;
-  if (!slider) {
-    return;
-  }
-  const min = Number(slider.min);
-  const max = Number(slider.max);
-  const current = Number(amount);
-  const ratio =
-    max > min && Number.isFinite(current) ? (current - min) / (max - min) : 1;
-  slider.style.setProperty("--stack-fill", `${Math.min(1, Math.max(0, ratio)) * 100}%`);
-}
-
-function applyCreateStackRange(balance) {
-  const slider = els.stack;
-  if (!slider) {
-    return;
-  }
-  const floor = stakeFloor();
-  const wallet = readReadyAmount(balance);
-  const ceiling = wallet == null || wallet < floor ? floor : Math.floor(wallet);
-  const previous = Number(slider.value);
-  let next = createStackTouched && Number.isFinite(previous) ? previous : floor;
-  if (next < floor) {
-    next = floor;
-  }
-  if (next > ceiling) {
-    next = ceiling;
-  }
-  slider.min = String(floor);
-  slider.max = String(ceiling);
-  slider.step = "1";
-  slider.value = String(Math.round(next));
-  if (els.stackMin) {
-    els.stackMin.textContent = String(floor);
-  }
-  if (els.stackMax) {
-    els.stackMax.textContent = String(ceiling);
-  }
-  renderCreateStack(slider.value);
-}
 
 function renderReadyAmount(amount) {
   if (els.readyAmount) {
@@ -206,7 +151,6 @@ export function renderWalletBalance(balance) {
   knownWalletBalance = balance == null || balance === "" ? null : balance;
   els.walletBalance.textContent =
     knownWalletBalance == null ? "—" : String(knownWalletBalance);
-  applyCreateStackRange(knownWalletBalance);
 }
 
 function applyWalletAction() {
@@ -345,17 +289,15 @@ export function showLobbyError(message) {
 
 export function setCreateBusy(busy) {
   els.createBtn.disabled = busy;
-  if (els.stack) {
-    els.stack.disabled = busy;
-  }
 }
 
 export function readCreateGameForm() {
+  const stake = Number(els.stake.value);
   return {
     playerCount: Number(els.playerCount.value),
     turnTime: Number(els.turnTime.value),
-    stake: Number(els.stake.value),
-    stack: Math.round(Number(els.stack?.value)),
+    stake,
+    stack: stake,
   };
 }
 
@@ -688,14 +630,6 @@ export function bindLobbyView({
     event.preventDefault();
     onCreate();
   });
-  els.stake?.addEventListener("change", () => {
-    applyCreateStackRange(knownWalletBalance);
-  });
-  els.stack?.addEventListener("input", () => {
-    createStackTouched = true;
-    renderCreateStack(els.stack.value);
-  });
-  applyCreateStackRange(knownWalletBalance);
   els.gearBtn?.addEventListener("click", (event) => {
     event.stopPropagation();
     setGearOpen(els.gearMenu.hidden);

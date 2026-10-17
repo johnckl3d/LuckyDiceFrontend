@@ -531,10 +531,10 @@ function createOpponentBoard(player, index) {
   const lanes = document.createElement("div");
   lanes.className = "lanes";
   [
-    { row: 3, label: "KEEP1" },
-    { row: 4, label: "KEEP2" },
-    { row: 2, label: "FLUX" },
-  ].forEach(({ row, label }) => {
+    { row: 3, label: "SET 1", id: "SET1" },
+    { row: 4, label: "SET 2", id: "SET2" },
+    { row: 2, label: "FLUX", id: "FLUX" },
+  ].forEach(({ row, label, id }) => {
     const boardRow = document.createElement("div");
     boardRow.className = "lane";
 
@@ -544,7 +544,7 @@ function createOpponentBoard(player, index) {
 
     const slots = document.createElement("div");
     slots.className = "dice-slots";
-    slots.id = `${player.id}-${label}`;
+    slots.id = `${player.id}-${id}`;
     slots.setAttribute("aria-label", label);
     appendRowSlots(slots, row, roll, true, true);
 
