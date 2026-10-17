@@ -21,27 +21,35 @@ body {
 }
 
 #login-screen {
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
   height: 100dvh;
   min-height: 100dvh;
-  padding: 0;
+  padding: 16px;
   overflow: hidden;
-  background: #070b18;
+  box-sizing: border-box;
+  background: #03060f;
   color: #f4f7fb;
   font-family: Rubik, system-ui, sans-serif;
 }
 
 #login-screen .login-phone {
   width: min(100%, 390px);
-  height: 100%;
+  height: min(844px, 100%);
   min-height: 0;
   margin: 0 auto;
   padding: 16px 20px 12px;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: auto;
+  border-radius: 32px;
+  background:
+    radial-gradient(ellipse at 82% 16%, rgba(47, 107, 255, 0.28), transparent 46%),
+    #070b18;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 28px 70px rgba(0, 0, 0, 0.55);
 }
 
 #login-screen .login-top {
@@ -94,7 +102,8 @@ body {
 
 #login-screen .login-art {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 72px;
+  margin: 0 -20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -165,7 +174,10 @@ body {
 #login-screen .login-error {
   margin: 0 0 10px;
   padding: 8px 10px;
+  border: 0;
   border-radius: 10px;
+  background: rgba(255, 90, 90, 0.16);
+  color: #ffb4b4;
   font-size: 13px;
 }
 
@@ -199,6 +211,119 @@ body {
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+@media (max-width: 480px) {
+  #login-screen {
+    padding: 0;
+  }
+
+  #login-screen .login-phone {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+#session-expired-modal.show {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+body:has(#session-expired-modal.show) .modal-backdrop {
+  --bs-backdrop-bg: #03060f;
+  --bs-backdrop-opacity: 1;
+  background-color: #03060f;
+  opacity: 1;
+}
+
+#session-expired-modal .session-dialog {
+  width: min(100%, 390px);
+  height: min(844px, 100%);
+  max-width: 390px;
+  max-height: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  box-sizing: border-box;
+  border-radius: 32px;
+  background:
+    radial-gradient(ellipse at 82% 16%, rgba(47, 107, 255, 0.28), transparent 46%),
+    #070b18;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 28px 70px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+#session-expired-modal .session-sheet {
+  width: 100%;
+  flex: none;
+  border: 0;
+  border-radius: 22px;
+  background: #141c30;
+  color: #f4f7fb;
+  box-shadow: none;
+  padding: 28px 22px 20px;
+  text-align: center;
+  font-family: Rubik, system-ui, sans-serif;
+  pointer-events: auto;
+}
+
+#session-expired-modal .session-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+#session-expired-modal .session-copy {
+  margin: 10px 0 20px;
+  color: #c5cad6;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+#session-expired-modal .session-ok {
+  width: 100%;
+  height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #2f6bff, #4da3ff);
+  color: #ffffff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+#session-expired-modal .session-ok:focus-visible {
+  outline: 2px solid #9ec8ff;
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  #session-expired-modal.show {
+    padding: 0;
+  }
+
+  #session-expired-modal .session-dialog {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 
 #game-screen {

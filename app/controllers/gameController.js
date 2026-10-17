@@ -1484,6 +1484,98 @@ async function joinResultGame() {
   }
 }
 
+function keepRowsFromDices(raw) {
+  const rows = normalizeDiceRows(raw);
+  return {
+    keep1: rows.set1,
+    keep2: rows.set2,
+    flux: rows.flux,
+  };
+}
+
+function normalizeOpeningArrange(payload) {
+  const data = parseJsonPayload(payload);
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
+  const gameId = pick(data, ["gameId", "GameId"]);
+  const listed = pick(data, ["players", "Players"]);
+  let players = [];
+
+  if (Array.isArray(listed)) {
+    players = listed
+      .map((item) => {
+        const playerId = pick(item, ["playerId", "PlayerId", "id", "Id", "userId", "UserId"]);
+        if (!playerId) {
+          return null;
+        }
+        const dices = pick(item, ["dices", "Dices", "dice", "Dice"]) ?? item;
+        return { playerId, ...keepRowsFromDices(dices) };
+      })
+      .filter(Boolean);
+  }
+
+  if (!players.length) {
+    const dices = pick(data, ["dices", "Dices", "dice", "Dice"]);
+    players = normalizePlayersFromDices(dices).map((entry) => ({
+      playerId: entry.playerId,
+      keep1: entry.set1,
+      keep2: entry.set2,
+      flux: entry.flux,
+    }));
+  }
+
+  if (!players.length) {
+    const playerId = pick(data, ["playerId", "PlayerId", "id", "Id", "userId", "UserId"]);
+    if (playerId) {
+      const dices = pick(data, ["dices", "Dices", "dice", "Dice"]) ?? data;
+      players = [{ playerId, ...keepRowsFromDices(dices) }];
+    }
+  }
+
+  return { gameId, players };
+}
+
+function applyOtherPlayerKeepRows(playerId, rows) {
+  const player = state.players.find((item) => playerMatches(item, playerId));
+  const resolvedId = player?.id ?? playerId;
+  setOpeningArrangement(resolvedId, rows);
+  if (String(resolvedId) !== String(playerId)) {
+    setOpeningArrangement(playerId, rows);
+  }
+}
+
+export function applyOpeningArrange(payload) {
+  setGamePhase("openingArrange");
+  const arranged = normalizeOpeningArrange(payload);
+  if (!arranged) {
+    return;
+  }
+
+  const gameId = arranged.gameId;
+  if (gameId && state.gameId && String(gameId) !== String(state.gameId)) {
+    return;
+  }
+
+  arranged.players.forEach((entry) => {
+    if (isLocalPlayer(entry.playerId)) {
+      return;
+    }
+    const hasRows = entry.keep1.length || entry.keep2.length || entry.flux.length;
+    if (!hasRows) {
+      return;
+    }
+    applyOtherPlayerKeepRows(entry.playerId, {
+      keep1: entry.keep1,
+      keep2: entry.keep2,
+      flux: entry.flux,
+    });
+  });
+
+  renderOpponentBoards();
+}
+
 export function applyOpeningRolled(payload) {
   setGamePhase("openingRoll");
   const rolls = normalizeOpeningRolled(payload);
@@ -1537,6 +1629,7 @@ async function listenForGameNotifications() {
   try {
     await subscribeGameNotifications({
       onOpeningRolled: applyOpeningRolled,
+      onOpeningArrange: applyOpeningArrange,
       onOpeningTally: applyOpeningTally,
       onRoundTally: applyRoundTally,
       onGameOver: applyGameOver,

@@ -667,15 +667,11 @@
       aria-labelledby="session-expired-title"
       aria-hidden="true"
     >
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="session-expired-title">Session expired</h5>
-          </div>
-          <div class="modal-body">Your session has expired. Please login again.</div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-dark" id="session-expired-ok-btn">OK</button>
-          </div>
+      <div class="modal-dialog session-dialog">
+        <div class="modal-content session-sheet">
+          <h2 class="session-title" id="session-expired-title">Session expired</h2>
+          <p class="session-copy">Your session has expired. Please login again.</p>
+          <button type="button" class="session-ok" id="session-expired-ok-btn">OK</button>
         </div>
       </div>
     </div>

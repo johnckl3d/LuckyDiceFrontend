@@ -235,6 +235,8 @@ function bindLobbyNotificationHandlers(connection) {
 function bindGameNotificationHandlers(connection) {
   connection.off("openingRolled");
   connection.off("OpeningRolled");
+  connection.off("openingArrange");
+  connection.off("OpeningArrange");
   connection.off("openingTally");
   connection.off("OpeningTally");
   connection.off("onTurnAssigned");
@@ -266,6 +268,10 @@ function bindGameNotificationHandlers(connection) {
   if (gameNotificationHandlers?.onOpeningRolled) {
     connection.on("openingRolled", gameNotificationHandlers.onOpeningRolled);
     connection.on("OpeningRolled", gameNotificationHandlers.onOpeningRolled);
+  }
+  if (gameNotificationHandlers?.onOpeningArrange) {
+    connection.on("openingArrange", gameNotificationHandlers.onOpeningArrange);
+    connection.on("OpeningArrange", gameNotificationHandlers.onOpeningArrange);
   }
   if (gameNotificationHandlers?.onOpeningTally) {
     connection.on("openingTally", gameNotificationHandlers.onOpeningTally);

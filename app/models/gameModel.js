@@ -108,8 +108,8 @@ export function setOpeningArrangement(playerId, rows) {
     });
   };
 
-  add(rows?.set1 ?? rows?.row1, 3);
-  add(rows?.set2 ?? rows?.row2, 4);
+  add(rows?.keep1 ?? rows?.set1 ?? rows?.row1, 3);
+  add(rows?.keep2 ?? rows?.set2 ?? rows?.row2, 4);
   add(rows?.flux ?? rows?.unarranged, 2);
 
   state.openingRolls[playerId] = { values, placements };
